@@ -1,0 +1,17 @@
+/dispatch
+/dist/
+*.sock
+*.tmp
+
+# Go
+*.test
+*.out
+
+# OS
+.DS_Store
+
+# GUI
+gui/node_modules/
+
+# Claude Code local state
+.claude/scheduled_tasks.lock

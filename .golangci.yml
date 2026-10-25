@@ -1,0 +1,18 @@
+version: "2"
+
+linters:
+  default: standard
+  exclusions:
+    rules:
+      # Ignoring the error from a deferred/best-effort Close or a
+      # ring-buffer Write (which never actually errors) is the normal,
+      # idiomatic shape of this codebase — not worth a lint warning. Test
+      # files get the same treatment since their error-ignoring is even
+      # lower-risk (a real problem there just fails the test).
+      - path: _test\.go
+        linters:
+          - errcheck
+      - path: \.go
+        linters:
+          - errcheck
+        text: "(Close|Write|Restore|Remove)` is not checked"

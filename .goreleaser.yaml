@@ -1,0 +1,62 @@
+version: 2
+
+project_name: dispatch
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: dispatch
+    main: ./cmd/dispatch
+    binary: dispatch
+    env:
+      - CGO_ENABLED=0
+    # Windows is not supported in v1: ptyproc spawns processes via Unix PTYs
+    # (creack/pty + syscall.SysProcAttr), which has no Windows equivalent
+    # without a separate ConPTY-based implementation. See README's "Known
+    # limitations."
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: dispatch
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^test:"
+      - "^ci:"
+      - "^docs:"
+
+release:
+  github:
+    owner: tuanbin007
+    name: dispatch
+
+brews:
+  - name: dispatch
+    repository:
+      owner: tuanbin007
+      name: homebrew-dispatch
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/tuanbin007/dispatch"
+    description: "Manage multiple AI coding-agent CLI sessions from one friendly terminal UI"
+    license: "MIT"
+    install: |
+      bin.install "dispatch"
+    test: |
+      system "#{bin}/dispatch --help"
