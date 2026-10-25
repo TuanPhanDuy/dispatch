@@ -44,16 +44,18 @@ changelog:
 
 release:
   github:
-    owner: tuanbin007
+    owner: TuanPhanDuy
     name: dispatch
 
 brews:
   - name: dispatch
     repository:
-      owner: tuanbin007
+      owner: TuanPhanDuy
       name: homebrew-dispatch
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/tuanbin007/dispatch"
+    # Skip the tap push until the homebrew-dispatch repo and its token exist.
+    skip_upload: '{{ if eq (index .Env "HOMEBREW_TAP_GITHUB_TOKEN") "" }}true{{ end }}'
+    homepage: "https://github.com/TuanPhanDuy/dispatch"
     description: "Manage multiple AI coding-agent CLI sessions from one friendly terminal UI"
     license: "MIT"
     install: |

@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/tuanbin007/dispatch/internal/client"
-	"github.com/tuanbin007/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/client"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
 )
 
 // outputMsg carries a chunk of raw PTY bytes delivered to an attached view.

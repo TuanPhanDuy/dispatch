@@ -9,11 +9,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/tuanbin007/dispatch/internal/client"
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/daemon"
-	"github.com/tuanbin007/dispatch/internal/ptyproc"
-	"github.com/tuanbin007/dispatch/internal/tui"
+	"github.com/TuanPhanDuy/dispatch/internal/client"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/daemon"
+	"github.com/TuanPhanDuy/dispatch/internal/ptyproc"
+	"github.com/TuanPhanDuy/dispatch/internal/tui"
 )
 
 // version/commit/date are injected by goreleaser via -ldflags at release

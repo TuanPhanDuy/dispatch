@@ -7,9 +7,9 @@ import (
 	"github.com/adrg/xdg"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tuanbin007/dispatch/internal/client"
-	"github.com/tuanbin007/dispatch/internal/client/inprocess"
-	"github.com/tuanbin007/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/client"
+	"github.com/TuanPhanDuy/dispatch/internal/client/inprocess"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
 )
 
 // newTestConfig loads a real config.Config backed by a temp XDG_CONFIG_HOME

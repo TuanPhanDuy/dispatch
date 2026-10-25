@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tuanbin007/dispatch/internal/client"
-	"github.com/tuanbin007/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/client"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
 )
 
 type viewMode int

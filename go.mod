@@ -1,4 +1,4 @@
-module github.com/tuanbin007/dispatch
+module github.com/TuanPhanDuy/dispatch
 
 go 1.27.1
 

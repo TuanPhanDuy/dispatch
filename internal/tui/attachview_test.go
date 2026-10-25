@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tuanbin007/dispatch/internal/client/inprocess"
-	"github.com/tuanbin007/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/client/inprocess"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
 )
 
 func newTestAttachModel(t *testing.T) *AttachModel {

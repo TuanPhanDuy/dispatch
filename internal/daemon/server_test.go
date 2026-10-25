@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/protocol"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
 
 // startTestServer stands up a real Registry+Server on a short-path unix

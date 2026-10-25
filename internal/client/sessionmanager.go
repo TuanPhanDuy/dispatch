@@ -1,6 +1,6 @@
 package client
 
-import "github.com/tuanbin007/dispatch/internal/config"
+import "github.com/TuanPhanDuy/dispatch/internal/config"
 
 // SessionManager is the one interface internal/tui is allowed to depend on
 // for session lifecycle and I/O. It's the seam that lets the daemon/socket

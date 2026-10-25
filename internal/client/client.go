@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/daemon"
-	"github.com/tuanbin007/dispatch/internal/protocol"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/daemon"
+	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
 
 const callTimeout = 10 * time.Second

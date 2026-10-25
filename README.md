@@ -6,22 +6,27 @@ Sessions are owned by a small background daemon, not the terminal window you ope
 
 ## Install
 
-### Homebrew (macOS/Linux)
+### Download a prebuilt binary (macOS/Linux)
+
+Grab the archive for your platform from the [latest release](https://github.com/TuanPhanDuy/dispatch/releases/latest), then:
 
 ```sh
-brew install tuanbin007/dispatch/dispatch
+tar -xzf dispatch_*_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz
+sudo mv dispatch /usr/local/bin/
 ```
+
+On macOS, if Gatekeeper blocks the unsigned binary: `xattr -d com.apple.quarantine /usr/local/bin/dispatch`.
 
 ### Go
 
 ```sh
-go install github.com/tuanbin007/dispatch/cmd/dispatch@latest
+go install github.com/TuanPhanDuy/dispatch/cmd/dispatch@latest
 ```
 
 ### From source
 
 ```sh
-git clone https://github.com/tuanbin007/dispatch
+git clone https://github.com/TuanPhanDuy/dispatch
 cd dispatch
 make build
 ./dispatch

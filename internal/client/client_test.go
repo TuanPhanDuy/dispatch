@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/daemon"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/daemon"
 )
 
 // startTestDaemon stands up a real Registry+Server listening on a unix

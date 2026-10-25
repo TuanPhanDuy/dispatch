@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/protocol"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
 
 func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {

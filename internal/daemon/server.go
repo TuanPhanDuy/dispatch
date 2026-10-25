@@ -7,8 +7,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/protocol"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
 
 // Server speaks the protocol wire format over accepted connections,

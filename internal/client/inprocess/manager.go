@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/tuanbin007/dispatch/internal/client"
-	"github.com/tuanbin007/dispatch/internal/config"
-	"github.com/tuanbin007/dispatch/internal/idle"
-	"github.com/tuanbin007/dispatch/internal/ptyproc"
+	"github.com/TuanPhanDuy/dispatch/internal/client"
+	"github.com/TuanPhanDuy/dispatch/internal/config"
+	"github.com/TuanPhanDuy/dispatch/internal/idle"
+	"github.com/TuanPhanDuy/dispatch/internal/ptyproc"
 )
 
 const idleSweepInterval = 2 * time.Second
