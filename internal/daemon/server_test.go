@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,43 +79,109 @@ func (tc *testClient) recv(t *testing.T, want protocol.MsgType, timeout time.Dur
 	}
 }
 
-func TestHandleAttachDetachesPreviousAttachment(t *testing.T) {
-	socketPath, registry := startTestServer(t)
+func (tc *testClient) attach(t *testing.T, reqID, sessionID string) {
+	t.Helper()
+	tc.send(t, protocol.Envelope{
+		Type: protocol.ReqAttach, ID: reqID,
+		Data: protocol.Marshal(protocol.AttachReq{SessionID: sessionID, Cols: 80, Rows: 24}),
+	})
+	tc.recv(t, protocol.RespAttach, 2*time.Second)
+}
 
+func createCatSessions(t *testing.T, registry *Registry, names ...string) []string {
+	t.Helper()
 	profile := config.AgentProfile{Name: "cat", Command: "cat"}
-	idA, err := registry.Create(profile, "a", ".", 80, 24)
-	if err != nil {
-		t.Fatalf("Create A: %v", err)
+	ids := make([]string, len(names))
+	for i, name := range names {
+		id, err := registry.Create(profile, name, ".", 80, 24)
+		if err != nil {
+			t.Fatalf("Create %s: %v", name, err)
+		}
+		ids[i] = id
 	}
-	idB, err := registry.Create(profile, "b", ".", 80, 24)
-	if err != nil {
-		t.Fatalf("Create B: %v", err)
-	}
+	return ids
+}
+
+// One connection attached to several sessions must keep receiving output
+// from all of them — the GUI tiles many panes over a single socket. This
+// used to silently detach the earlier session on every new attach.
+func TestConnectionReceivesOutputFromEverySessionItIsAttachedTo(t *testing.T) {
+	socketPath, registry := startTestServer(t)
+	ids := createCatSessions(t, registry, "a", "b")
+	idA, idB := ids[0], ids[1]
 
 	tc := dialTestClient(t, socketPath)
+	tc.attach(t, "r1", idA)
+	tc.attach(t, "r2", idB)
 
-	tc.send(t, protocol.Envelope{
-		Type: protocol.ReqAttach, ID: "r1",
-		Data: protocol.Marshal(protocol.AttachReq{SessionID: idA, Cols: 80, Rows: 24}),
-	})
-	tc.recv(t, protocol.RespAttach, 2*time.Second)
+	for _, id := range ids {
+		tc.send(t, protocol.Envelope{
+			Type: protocol.ReqInput,
+			Data: protocol.Marshal(protocol.InputReq{SessionID: id, Bytes: []byte("ping-" + id + "\n")}),
+		})
+	}
+
+	seen := map[string]string{}
+	_ = tc.nc.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for !strings.Contains(seen[idA], "ping-"+idA) || !strings.Contains(seen[idB], "ping-"+idB) {
+		env, err := protocol.ReadEnvelope(tc.r)
+		if err != nil {
+			t.Fatalf("waiting for output from both sessions (got %q): %v", seen, err)
+		}
+		if env.Type != protocol.EventOutput {
+			continue
+		}
+		var ev protocol.OutputEvent
+		if err := protocol.Unmarshal(env.Data, &ev); err != nil {
+			t.Fatalf("unmarshal output: %v", err)
+		}
+		seen[ev.SessionID] += string(ev.Bytes)
+	}
+}
+
+func TestReattachingSameSessionReplacesSubscription(t *testing.T) {
+	socketPath, registry := startTestServer(t)
+	idA := createCatSessions(t, registry, "a")[0]
+
+	tc := dialTestClient(t, socketPath)
+	tc.attach(t, "r1", idA)
+	tc.attach(t, "r2", idA)
 
 	if got := subCount(registry, idA); got != 1 {
-		t.Fatalf("expected 1 subscriber on A right after attaching, got %d", got)
+		t.Fatalf("expected re-attach to replace the subscription, got %d subscribers", got)
 	}
+}
 
-	// Attach to B WITHOUT ever sending ReqDetach for A — this is exactly
-	// the sequence that used to leak A's subscription forever.
-	tc.send(t, protocol.Envelope{
-		Type: protocol.ReqAttach, ID: "r2",
-		Data: protocol.Marshal(protocol.AttachReq{SessionID: idB, Cols: 80, Rows: 24}),
-	})
-	tc.recv(t, protocol.RespAttach, 2*time.Second)
+func TestDetachDropsOnlyTheNamedSession(t *testing.T) {
+	socketPath, registry := startTestServer(t)
+	ids := createCatSessions(t, registry, "a", "b")
+	idA, idB := ids[0], ids[1]
 
-	waitUntil(t, 2*time.Second, func() bool { return subCount(registry, idA) == 0 })
+	tc := dialTestClient(t, socketPath)
+	tc.attach(t, "r1", idA)
+	tc.attach(t, "r2", idB)
+
+	tc.send(t, protocol.Envelope{Type: protocol.ReqDetach, ID: "r3", Data: protocol.Marshal(protocol.SessionIDReq{SessionID: idA})})
+	tc.recv(t, protocol.RespOK, 2*time.Second)
+
+	if got := subCount(registry, idA); got != 0 {
+		t.Fatalf("expected A detached, got %d subscribers", got)
+	}
 	if got := subCount(registry, idB); got != 1 {
-		t.Fatalf("expected 1 subscriber on B after attaching, got %d", got)
+		t.Fatalf("expected B still attached, got %d subscribers", got)
 	}
+}
+
+func TestDisconnectDetachesEverySession(t *testing.T) {
+	socketPath, registry := startTestServer(t)
+	ids := createCatSessions(t, registry, "a", "b")
+
+	tc := dialTestClient(t, socketPath)
+	tc.attach(t, "r1", ids[0])
+	tc.attach(t, "r2", ids[1])
+	tc.nc.Close()
+
+	waitUntil(t, 2*time.Second, func() bool { return subCount(registry, ids[0]) == 0 && subCount(registry, ids[1]) == 0 })
 }
 
 func TestClientDisconnectDuringActiveOutputDoesNotCrashServer(t *testing.T) {

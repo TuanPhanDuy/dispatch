@@ -48,15 +48,14 @@ type conn struct {
 	// back into c.send while holding a session lock, so holding c.mu
 	// across a Registry call here would risk an AB-BA deadlock with that
 	// goroutine. Capture-then-release-then-call instead.
-	mu          sync.Mutex
-	outClosed   bool
-	listSubID   int
-	attachedID  string
-	attachSubID int
+	mu        sync.Mutex
+	outClosed bool
+	listSubID int
+	attached  map[string]int // sessionID -> output subscription ID
 }
 
 func (srv *Server) handleConn(nc net.Conn) {
-	c := &conn{srv: srv, nc: nc, out: make(chan protocol.Envelope, 256)}
+	c := &conn{srv: srv, nc: nc, out: make(chan protocol.Envelope, 256), attached: make(map[string]int)}
 	defer nc.Close()
 
 	go c.writeLoop()
@@ -162,7 +161,7 @@ func (c *conn) handle(env protocol.Envelope) {
 			c.sendErr(env.ID, err)
 			return
 		}
-		c.detachIfAttachedTo(req.SessionID)
+		c.detach(req.SessionID)
 		c.sendResp(env.ID, protocol.RespOK, nil)
 
 	case protocol.ReqInput:
@@ -234,12 +233,11 @@ func (c *conn) handleAttach(env protocol.Envelope) {
 		return
 	}
 
-	// A connection can only ever track one attachment (attachedID/
-	// attachSubID is a scalar pair, not a set) — attaching to a new
-	// session without detaching the previous one first would otherwise
-	// leak the old subscription forever (nothing could ever find its
-	// subID again to detach it) and keep delivering its output here.
-	c.detachIfAttachedTo("")
+	// A connection may be attached to many sessions at once (the GUI
+	// tiles several in one window over a single socket), but to each
+	// session only once: re-attaching replaces the old subscription so it
+	// can't leak or deliver every chunk twice.
+	c.detach(req.SessionID)
 
 	scrollback, subID, err := c.srv.registry.Attach(req.SessionID, req.Cols, req.Rows, func(ev protocol.OutputEvent) {
 		c.send(protocol.Envelope{Type: protocol.EventOutput, Data: protocol.Marshal(ev)})
@@ -250,33 +248,34 @@ func (c *conn) handleAttach(env protocol.Envelope) {
 	}
 
 	c.mu.Lock()
-	c.attachedID, c.attachSubID = req.SessionID, subID
+	c.attached[req.SessionID] = subID
 	c.mu.Unlock()
 	c.sendResp(env.ID, protocol.RespAttach, protocol.AttachResp{Scrollback: scrollback})
 }
 
-// detachIfAttachedTo detaches the connection's current attachment, if any.
-// If sessionID is non-empty, it only detaches when the current attachment
-// matches it (the ReqDetach path, which should be a no-op for a stale
-// request naming a session this connection isn't attached to); an empty
-// sessionID unconditionally detaches whatever is currently attached (the
-// "about to attach to something else" path).
-func (c *conn) detachIfAttachedTo(sessionID string) {
+// detach drops this connection's attachment to sessionID, if it has one;
+// a stale request naming a session it isn't attached to is a no-op.
+func (c *conn) detach(sessionID string) {
 	c.mu.Lock()
-	id, subID := c.attachedID, c.attachSubID
-	if id == "" || (sessionID != "" && id != sessionID) {
-		c.mu.Unlock()
-		return
-	}
-	c.attachedID, c.attachSubID = "", 0
+	subID, ok := c.attached[sessionID]
+	delete(c.attached, sessionID)
 	c.mu.Unlock()
 
-	_ = c.srv.registry.Detach(id, subID)
+	if ok {
+		_ = c.srv.registry.Detach(sessionID, subID)
+	}
 }
 
-// cleanup detaches (but does not kill) any session this connection was
-// attached to — the session keeps running; only the output stream to this
-// now-dead connection stops.
+// cleanup detaches (but does not kill) every session this connection was
+// attached to — the sessions keep running; only the output streams to this
+// now-dead connection stop.
 func (c *conn) cleanup() {
-	c.detachIfAttachedTo("")
+	c.mu.Lock()
+	attached := c.attached
+	c.attached = make(map[string]int)
+	c.mu.Unlock()
+
+	for id, subID := range attached {
+		_ = c.srv.registry.Detach(id, subID)
+	}
 }

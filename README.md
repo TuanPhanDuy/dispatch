@@ -67,6 +67,19 @@ Everything you type is forwarded straight to the agent — arrow keys, `ctrl+c`,
 | `k` | kill |
 | `q` | quit the TUI |
 
+### Desktop app (tiled panes)
+
+`gui/` is an Electron client for the same daemon (`cd gui && npm install && npm start`). It tiles sessions side by side so you can watch several agents at once:
+
+| Key | Action |
+|---|---|
+| `⌘D` / `⌘⇧D` | split the focused pane right / down (pick or launch a session) |
+| `⌘⌥` + arrows | move focus between panes |
+| `⌘⇧↵` | zoom / unzoom the focused pane |
+| `⌘⇧W` | close the pane (the session stays open as a tab) |
+
+Drag a divider to resize. Each pane's PTY is resized to fit it, and panes whose agent has gone idle pulse until you look at them. The layout is restored the next time you open the app.
+
 ## Configuration
 
 `~/.config/dispatch/config.yaml` (or `~/Library/Application Support/dispatch/config.yaml` on macOS):
