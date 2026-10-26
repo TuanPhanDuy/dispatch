@@ -8,6 +8,10 @@ type AgentProfile struct {
 	Command              string   `yaml:"command"`
 	Args                 []string `yaml:"args,omitempty"`
 	IdleAttentionSeconds int      `yaml:"idle_attention_seconds,omitempty"`
+	// Account runs the profile's sessions under a named account with its
+	// own configuration home and login (see internal/accounts). Empty
+	// means the agent's default configuration.
+	Account string `yaml:"account,omitempty"`
 }
 
 // SessionDef is a persisted session definition (what to relaunch), not live

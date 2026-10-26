@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/TuanPhanDuy/dispatch/internal/accounts"
 	"github.com/TuanPhanDuy/dispatch/internal/client"
 	"github.com/TuanPhanDuy/dispatch/internal/config"
 	"github.com/TuanPhanDuy/dispatch/internal/idle"
@@ -27,6 +28,7 @@ type session struct {
 	name    string
 	profile config.AgentProfile
 	cwd     string
+	env     []string // nil inherits this process's environment
 
 	proc      *ptyproc.Process
 	ring      *ptyproc.RingBuffer
@@ -124,7 +126,11 @@ func (m *Manager) uniqueNameLocked(name string) string {
 }
 
 func (m *Manager) Create(profile config.AgentProfile, name, cwd string, cols, rows int) (string, error) {
-	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, nil, cols, rows)
+	env, err := accounts.SessionEnv(profile.Account)
+	if err != nil {
+		return "", err
+	}
+	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, env, cols, rows)
 	if err != nil {
 		return "", fmt.Errorf("spawn %s: %w", profile.Command, err)
 	}
@@ -134,6 +140,7 @@ func (m *Manager) Create(profile config.AgentProfile, name, cwd string, cols, ro
 		id:        id,
 		profile:   profile,
 		cwd:       cwd,
+		env:       env,
 		proc:      proc,
 		ring:      ptyproc.NewRingBuffer(m.scrollbackCap),
 		idleTrack: idle.NewTracker(m.idleThreshold(profile)),
@@ -277,6 +284,7 @@ func (m *Manager) List() ([]client.SessionSummary, error) {
 			Status:    s.status,
 			StartedAt: s.startedAt,
 			ExitCode:  s.exitCode,
+			Account:   s.profile.Account,
 		})
 		s.mu.Unlock()
 	}
@@ -444,7 +452,7 @@ func (m *Manager) Restart(id string) error {
 		_ = s.proc.Kill()
 		_ = s.proc.Close()
 	}
-	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, nil, 80, 24)
+	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, s.env, 80, 24)
 	if startErr != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("restart %s: %w", s.profile.Command, startErr)

@@ -328,6 +328,20 @@ button { font-family: var(--sans); }
 .field-dir input { flex: 1; font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
 .field-dir .btn { flex: none; }
 .field-hint { font-size: 11.5px; color: var(--text-dim); }
+.field-hint:empty { display: none; }
+.field-hint.is-error { color: var(--danger); }
+
+/* Which Claude account a session runs under. Hidden for the default one. */
+.account-chip {
+  display: inline-flex; align-items: center;
+  font-family: var(--mono); font-size: 10.5px; line-height: 16px;
+  padding: 0 6px; border-radius: 999px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  white-space: nowrap; flex: none;
+}
+.cell-agent .account-chip { margin-left: 6px; }
+.term-head .account-chip { color: #7fd1c7; background: rgba(79,173,163,0.14); border-color: rgba(79,173,163,0.35); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
 
 /* ---- attach view: tab strip ---- */

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -142,5 +143,25 @@ func TestListModelRestartIgnoredOnStoppedRow(t *testing.T) {
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
 	if cmd != nil {
 		t.Fatal("expected 'R' on a stopped row to be a no-op")
+	}
+}
+
+func TestListModelShowsEachRowsAccount(t *testing.T) {
+	m := NewListModel()
+	m.SetRows([]Row{
+		{Live: true, Summary: client.SessionSummary{Name: "work-claude", Status: client.StatusRunning, Cwd: "/w", Account: "work"}},
+		{Live: true, Summary: client.SessionSummary{Name: "plain", Status: client.StatusRunning, Cwd: "/p"}},
+		{Live: false, Def: config.SessionDef{Name: "saved", Profile: "claude-personal", Cwd: "/s"}, DefAccount: "personal"},
+	})
+	view := m.View()
+	for _, want := range []string{"@work", "@personal"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view is missing %q:\n%s", want, view)
+		}
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "plain") && strings.Contains(line, "@") {
+			t.Fatalf("default-account row shows an account: %q", line)
+		}
 	}
 }

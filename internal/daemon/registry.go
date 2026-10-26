@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/TuanPhanDuy/dispatch/internal/accounts"
 	"github.com/TuanPhanDuy/dispatch/internal/config"
 	"github.com/TuanPhanDuy/dispatch/internal/idle"
 	"github.com/TuanPhanDuy/dispatch/internal/protocol"
@@ -35,6 +36,7 @@ type session struct {
 	name    string
 	cwd     string
 	profile config.AgentProfile
+	env     []string // nil inherits the daemon's environment
 
 	proc      *ptyproc.Process
 	ring      *ptyproc.RingBuffer
@@ -57,6 +59,7 @@ func (s *session) summary() protocol.SessionSummary {
 		Cwd:       s.cwd,
 		Status:    s.status,
 		StartedAt: s.startedAt,
+		Account:   s.profile.Account,
 	}
 }
 
@@ -149,7 +152,11 @@ func (r *Registry) uniqueNameLocked(name string) string {
 }
 
 func (r *Registry) Create(profile config.AgentProfile, name, cwd string, cols, rows int) (string, error) {
-	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, nil, cols, rows)
+	env, err := accounts.SessionEnv(profile.Account)
+	if err != nil {
+		return "", err
+	}
+	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, env, cols, rows)
 	if err != nil {
 		return "", fmt.Errorf("spawn %s: %w", profile.Command, err)
 	}
@@ -159,6 +166,7 @@ func (r *Registry) Create(profile config.AgentProfile, name, cwd string, cols, r
 		id:        id,
 		cwd:       cwd,
 		profile:   profile,
+		env:       env,
 		proc:      proc,
 		ring:      ptyproc.NewRingBuffer(r.scrollbackCap),
 		idleTrack: idle.NewTracker(r.idleThreshold(profile)),
@@ -457,7 +465,7 @@ func (r *Registry) Restart(id string) error {
 		_ = s.proc.Kill()
 		_ = s.proc.Close()
 	}
-	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, nil, 80, 24)
+	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, s.env, 80, 24)
 	if startErr != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("restart %s: %w", s.profile.Command, startErr)

@@ -10,6 +10,7 @@ This guide covers installing, day-to-day use of both clients, configuration, upd
 - [Install](#install)
 - [The desktop app](#the-desktop-app)
 - [The terminal UI](#the-terminal-ui)
+- [Multiple Claude accounts](#multiple-claude-accounts)
 - [Configuration](#configuration)
 - [Updating](#updating)
 - [Troubleshooting](#troubleshooting)
@@ -161,6 +162,59 @@ Everything you type goes to the agent. The only reserved key is `ctrl+\`, which 
 
 The TUI shows one session at a time. Use the desktop app if you want several side by side.
 
+## Multiple Claude accounts
+
+Each Claude Code session can run under its own **account**, so you can be signed in to several Claude accounts at once — say a personal Pro plan in one pane and your company's Team plan in the next.
+
+An account is a separate Claude Code home: its own login, settings, conversation history, MCP servers and user-level `CLAUDE.md`, everything that normally lives in `~/.claude`. Project files such as a repository's `.claude/` folder are still shared, because they belong to the project. Sessions that don't pick an account keep using your usual `~/.claude`.
+
+> Use accounts to keep genuinely separate identities apart, such as personal and work. Spreading one person's work over several accounts to get around a plan's usage limits may break Anthropic's terms; check them for your situation.
+
+### In the desktop app
+
+1. Click **+ New session** and choose **Claude Code** as the agent. A **Claude account** field appears.
+2. Pick one:
+   - **Default (~/.claude)** — your usual login.
+   - **@name** — an account you've used before.
+   - **+ New account…** — type a name such as `work` or `personal` (letters, digits, `.`, `_`, `-`).
+3. Click **Create session**.
+
+The first session in a new account starts like a fresh Claude Code install: pick a theme, then sign in. Claude Code opens your browser to log in — make sure the browser is signed in to the Claude account you want for this one, for example by using a separate browser profile, or by signing out of claude.ai first. If you're already in the session and need to sign in again, type `/login`.
+
+After that, every session you start under the same account is already signed in. The dialog remembers the last account you picked.
+
+Sessions under an account carry an **@name** chip in the session list, on their tab and on their pane header, so you can always tell which account a pane is using. **Restart** keeps a session's account, and the recent-launches strip relaunches under the same account too.
+
+### In the terminal UI
+
+Add a profile with an `account` to your [config.yaml](#configuration), one per account you want:
+
+```yaml
+profiles:
+  - name: claude-work
+    command: claude
+    account: work
+  - name: claude-personal
+    command: claude
+    account: personal
+```
+
+Pick that profile in the **New session** wizard. The session list shows the account next to each session's status. The desktop app and the TUI share accounts: a profile with `account: work` uses the same login as **@work** in the desktop app.
+
+### Where accounts live
+
+| OS | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/dispatch/accounts/<name>` |
+| Linux | `~/.local/share/dispatch/accounts/<name>` (or `$XDG_DATA_HOME/dispatch/accounts/<name>`) |
+
+dispatch runs the session with `CLAUDE_CONFIG_DIR` set to that folder. On macOS, Claude Code keeps each account's login token in the Keychain under its own entry.
+
+### Removing an account
+
+1. Open a session under that account and type `/logout`, so its login is removed from the Keychain.
+2. Delete its folder, e.g. `rm -rf ~/Library/Application\ Support/dispatch/accounts/work`.
+
 ## Configuration
 
 The terminal UI reads `config.yaml`, creating it with defaults on first run:
@@ -182,11 +236,14 @@ profiles:                       # what the TUI's New session wizard offers
     args: ["--full-auto"]
   - name: shell
     command: zsh
+  - name: claude-work
+    command: claude
+    account: work               # run under a separate Claude account
 
 sessions: []                    # written automatically; see below
 ```
 
-- **profiles** are templates. Add one for any CLI you like, with its arguments.
+- **profiles** are templates. Add one for any CLI you like, with its arguments. `account` runs its sessions under a [separate Claude account](#multiple-claude-accounts).
 - **sessions** is maintained by dispatch: each session you create or rename is saved with its name, profile, and directory, so it stays in the list after it exits and can be relaunched with `enter`.
 
 The desktop app doesn't use profiles. Its **New session** dialog offers Claude Code, Codex, and Aider when they're installed, plus your login shell, and it keeps its own list of recent launches.
@@ -223,6 +280,12 @@ dispatch talks to the daemon over a socket at `$XDG_RUNTIME_DIR/dispatch.sock` i
 **In the desktop app, only one of several open tabs updates.**
 Your daemon predates v0.2.0, which could only stream one session per window. Restart it (see [Updating](#updating)).
 
+**The Claude account field is greyed out, saying to restart the daemon.**
+Your daemon predates accounts (v0.4.0). Restart it (see [Updating](#updating)). Until then, sessions run under your default login.
+
+**A session under an account opens on the welcome / login screen every time.**
+It hasn't been signed in yet: finish the theme step and log in once, and later sessions under that account reuse it. If it keeps asking, check that the account's folder still exists (see [Where accounts live](#where-accounts-live)).
+
 **"Needs attention" fires while the agent is still working.**
 Some agents think silently for long stretches. Raise `idle_attention_seconds` for that profile.
 
@@ -235,6 +298,8 @@ The daemon was stopped: by a restart, a crash, logging out, or rebooting. Sessio
 pkill -f "dispatch daemon"                          # ends all sessions
 rm -rf /Applications/dispatch.app                   # desktop app
 sudo rm -f /usr/local/bin/dispatch                  # terminal UI
-rm -rf ~/Library/Application\ Support/dispatch      # macOS settings, recents, saved layout
-rm -rf ~/.config/dispatch                           # Linux settings
+rm -rf ~/Library/Application\ Support/dispatch      # macOS settings, recents, layout, accounts
+rm -rf ~/.config/dispatch ~/.local/share/dispatch   # Linux settings and accounts
 ```
+
+If you used [accounts](#multiple-claude-accounts), run `/logout` in a session under each one first, so their logins are removed from the Keychain.
