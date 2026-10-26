@@ -58,6 +58,9 @@
     <div class="tabstrip" id="tabstrip">
       <div class="spacer"></div>
       <div class="tabstrip-tools">
+        <button class="icon-trigger" id="btn-pane-help" aria-label="Working with panes" aria-describedby="pane-help">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v3.6"/><circle cx="8" cy="5" r="0.4" fill="currentColor"/></svg>
+        </button>
         <button class="icon-trigger" id="btn-split-row" title="Split right (&#8984;D)">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M8 3v10"/></svg>
         </button>
@@ -73,7 +76,6 @@
         <button class="btn btn-ghost btn-sm" id="btn-back">&larr; Session list</button>
       </div>
     </div>
-    <p class="pin-hint hidden" id="pin-hint"></p>
     <div class="attach-wrap" id="attach-wrap"></div>
     <div id="pane-parking" hidden></div>
   </div>
@@ -137,6 +139,20 @@
     <div class="sheet-row"><span>Close pane (keeps the tab)</span><kbd>&#8984;&#8679;W</kbd></div>
     <div class="sheet-row"><span>Show this list</span><kbd>&#8984;/</kbd></div>
   </div>
+</div>
+
+<!-- Pane tips, shown while hovering/focusing #btn-pane-help. Lives outside the
+     tab strip because the strip scrolls horizontally and would clip it. -->
+<div class="hover-card" id="pane-help" role="tooltip">
+  <p class="hover-card-title">Working with panes</p>
+  <div class="sheet-row"><span>Split right</span><kbd>&#8984;D</kbd></div>
+  <div class="sheet-row"><span>Split down</span><kbd>&#8984;&#8679;D</kbd></div>
+  <div class="sheet-row"><span>Move between panes</span><span><kbd>&#8984;&#8997;</kbd>+<kbd>&larr;&uarr;&darr;&rarr;</kbd></span></div>
+  <div class="sheet-row"><span>Zoom / unzoom</span><kbd>&#8984;&#8679;&#8629;</kbd></div>
+  <div class="sheet-row"><span>Close pane, keep tab</span><kbd>&#8984;&#8679;W</kbd></div>
+  <div class="sheet-row"><span>Resize</span><span class="hover-card-note">drag a divider</span></div>
+  <div class="sheet-row"><span>Open a tab beside this one</span><span class="hover-card-note">split icon on the tab</span></div>
+  <p class="hover-card-foot"><kbd>&#8984;/</kbd> all shortcuts</p>
 </div>
 
 <div class="toast-stack" id="toast-stack"></div>

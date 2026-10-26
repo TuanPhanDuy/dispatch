@@ -39,7 +39,6 @@ const listFlat = document.getElementById('list-flat');
 const listGrouped = document.getElementById('list-grouped');
 const emptyState = document.getElementById('empty-state');
 const tabstrip = document.getElementById('tabstrip');
-const pinHint = document.getElementById('pin-hint');
 const attachWrap = document.getElementById('attach-wrap');
 const paneParking = document.getElementById('pane-parking');
 const bellBadge = document.getElementById('bell-badge');
@@ -527,13 +526,22 @@ function renderLayout() {
   attachWrap.classList.toggle('is-zoomed', !!zoomedId);
   attachWrap.classList.toggle('is-tiled', leafIds(layout).length > 1);
   updatePaneHeads();
-
-  const single = leafIds(layout).length === 1;
-  pinHint.classList.toggle('hidden', !single);
-  if (single) {
-    pinHint.innerHTML = '<kbd>&#8984;D</kbd> split right · <kbd>&#8984;&#8679;D</kbd> split down · drag a divider to resize · <kbd>&#8984;&#8997;</kbd>+arrows to move between panes';
-  }
 }
+
+// Pane tips popover: anchored under its button, right-aligned with it.
+const paneHelpBtn = document.getElementById('btn-pane-help');
+const paneHelp = document.getElementById('pane-help');
+function showPaneHelp() {
+  const r = paneHelpBtn.getBoundingClientRect();
+  paneHelp.style.top = `${r.bottom + 8}px`;
+  paneHelp.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+  paneHelp.classList.add('open');
+}
+function hidePaneHelp() { paneHelp.classList.remove('open'); }
+paneHelpBtn.addEventListener('mouseenter', showPaneHelp);
+paneHelpBtn.addEventListener('mouseleave', hidePaneHelp);
+paneHelpBtn.addEventListener('focus', showPaneHelp);
+paneHelpBtn.addEventListener('blur', hidePaneHelp);
 
 function buildNode(node) {
   if (node.type === 'leaf') return tabs.get(node.id).container;

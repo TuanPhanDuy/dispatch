@@ -386,14 +386,24 @@ button { font-family: var(--sans); }
 .tabstrip .spacer { flex: 1; min-width: 12px; }
 .tabstrip-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 
-.pin-hint {
-  padding: 6px 16px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);
-  border-bottom: 1px solid var(--border); flex: none;
+.hover-card {
+  position: fixed; z-index: 40; width: 300px;
+  padding: 12px 14px 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow);
+  font-size: 12.5px;
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
 }
-.pin-hint kbd {
-  font-family: inherit; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 4px; padding: 1px 5px; font-size: 10.5px;
+.hover-card.open { opacity: 1; transform: none; }
+.hover-card-title { font-weight: 600; margin-bottom: 6px; }
+.hover-card .sheet-row { padding: 5px 0; font-size: 12.5px; }
+.hover-card kbd {
+  font-family: var(--mono); font-size: 10.5px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
 }
+.hover-card-note { color: var(--text-dim); font-size: 11.5px; }
+.hover-card-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11.5px; }
 
 /* ---- attach view: tiled terminal panes ---- */
 .attach-wrap { flex: 1; display: flex; padding: 16px 20px 20px; min-height: 0; min-width: 0; }
