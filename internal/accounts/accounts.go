@@ -1,19 +1,27 @@
-// Package accounts gives each named account its own Claude Code
-// configuration home, so sessions under different accounts stay logged in
-// to different Claude accounts side by side.
+// Package accounts lets sessions run under named accounts, so the same
+// agent CLI can be signed in to different accounts side by side.
 //
-// Claude Code keeps its settings, history and login under CLAUDE_CONFIG_DIR
-// (default ~/.claude). On macOS the login token lives in the Keychain, under
-// a service name suffixed with a hash of CLAUDE_CONFIG_DIR whenever that
-// variable is set — so pointing two sessions at two different directories
-// gives them two independent logins. An account is nothing more than such a
-// directory, created on first use; there is no registry to keep in sync.
+// An account is a directory. Inside it, each supported tool gets its own
+// configuration home, pointed at through the variable that tool reads:
+//
+//	<account>/claude  CLAUDE_CONFIG_DIR  (Claude Code; default ~/.claude)
+//	<account>/codex   CODEX_HOME         (Codex CLI;  default ~/.codex)
+//
+// Both tools keep their login inside that home, or — when they use the OS
+// keychain — under a keychain key derived from the home's path, so two
+// accounts never share a login. Every session under an account gets all of
+// these variables, whatever its command: a shell opened under "work" runs
+// `claude` and `codex` as "work" too.
+//
+// For tools without a built-in entry, an account's optional env file adds
+// arbitrary KEY=VALUE pairs (API keys, another tool's home variable, ...).
 //
 // The daemon is the only caller that resolves names to directories, so the
 // TUI and the GUI always agree on where an account lives regardless of OS.
 package accounts
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,15 +32,31 @@ import (
 	"github.com/adrg/xdg"
 )
 
-// ConfigDirEnv is the variable Claude Code reads its configuration home from.
-const ConfigDirEnv = "CLAUDE_CONFIG_DIR"
+// Tool is a CLI whose configuration home an account isolates.
+type Tool struct {
+	Name   string // subdirectory of the account
+	EnvVar string // variable the tool reads its home from
+}
 
-// secureStorageEnv, when set, overrides which directory Claude Code derives
-// its Keychain entry from. An account session must not inherit one from the
-// daemon's environment, or every account would share a single login.
-const secureStorageEnv = "CLAUDE_SECURESTORAGE_CONFIG_DIR"
+// Tools are the CLIs every account isolates.
+var Tools = []Tool{
+	{Name: "claude", EnvVar: "CLAUDE_CONFIG_DIR"},
+	{Name: "codex", EnvVar: "CODEX_HOME"},
+}
 
-var validName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`)
+// EnvFileName is the per-account file of extra KEY=VALUE variables.
+const EnvFileName = "env"
+
+// clearedVars must not leak from the daemon's own environment into an
+// account session: CLAUDE_SECURESTORAGE_CONFIG_DIR overrides which
+// directory Claude Code derives its keychain entry from, which would make
+// every account share one login.
+var clearedVars = []string{"CLAUDE_SECURESTORAGE_CONFIG_DIR"}
+
+var (
+	validName   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`)
+	validEnvKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+)
 
 // Validate reports whether name can be used as an account name: 1–40
 // letters, digits, '.', '_' or '-', starting with a letter or digit (so it
@@ -58,39 +82,124 @@ func Root() string {
 	return filepath.Join(xdg.DataHome, "dispatch", "accounts")
 }
 
-// Dir returns the configuration home for account name, creating it
-// (private to the user) if it doesn't exist yet.
+// envFileTemplate is written into every new account so the file is easy
+// to find; it sets nothing until a line is uncommented.
+const envFileTemplate = `# Extra environment variables for every session under this account,
+# one KEY=VALUE per line. Lines starting with # are ignored.
+#
+# API keys for tools that log in with one, e.g. Aider:
+#   OPENAI_API_KEY=sk-...
+#   ANTHROPIC_API_KEY=sk-ant-...
+#
+# Another tool's configuration home, to keep its login per account:
+#   GEMINI_CLI_HOME=/path/to/this/account/gemini
+`
+
+// Dir returns account name's directory, creating it and each tool's home
+// inside it (all private to the user) as needed.
 func Dir(name string) (string, error) {
 	if err := Validate(name); err != nil {
 		return "", err
 	}
 	dir := filepath.Join(Root(), name)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create account %q: %w", name, err)
+	for _, t := range Tools {
+		if err := os.MkdirAll(filepath.Join(dir, t.Name), 0o700); err != nil {
+			return "", fmt.Errorf("create account %q: %w", name, err)
+		}
+	}
+	envFile := filepath.Join(dir, EnvFileName)
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		if err := os.WriteFile(envFile, []byte(envFileTemplate), 0o600); err != nil {
+			return "", fmt.Errorf("create account %q: %w", name, err)
+		}
 	}
 	return dir, nil
 }
 
-// Env returns base with the variables that select account name's
-// configuration home, replacing any inherited values of them.
+// Env returns base with account name's variables applied: each tool's
+// home, then the account's env file, each replacing any inherited value.
 func Env(base []string, name string) ([]string, error) {
 	dir, err := Dir(name)
 	if err != nil {
 		return nil, err
 	}
-	env := make([]string, 0, len(base)+1)
+	extra, err := readEnvFile(filepath.Join(dir, EnvFileName))
+	if err != nil {
+		return nil, fmt.Errorf("account %q: %w", name, err)
+	}
+
+	set := make([]string, 0, len(Tools)+len(extra))
+	for _, t := range Tools {
+		set = append(set, t.EnvVar+"="+filepath.Join(dir, t.Name))
+	}
+	set = append(set, extra...)
+
+	drop := map[string]bool{}
+	for _, k := range clearedVars {
+		drop[k] = true
+	}
+	for _, kv := range set {
+		drop[kv[:strings.IndexByte(kv, '=')]] = true
+	}
+	env := make([]string, 0, len(base)+len(set))
 	for _, kv := range base {
-		if strings.HasPrefix(kv, ConfigDirEnv+"=") || strings.HasPrefix(kv, secureStorageEnv+"=") {
+		if i := strings.IndexByte(kv, '='); i >= 0 && drop[kv[:i]] {
 			continue
 		}
 		env = append(env, kv)
 	}
-	return append(env, ConfigDirEnv+"="+dir), nil
+	// Later entries win, so an env file line can override a tool home.
+	seen := map[string]int{}
+	for _, kv := range set {
+		k := kv[:strings.IndexByte(kv, '=')]
+		if i, ok := seen[k]; ok {
+			env[i] = kv
+			continue
+		}
+		seen[k] = len(env)
+		env = append(env, kv)
+	}
+	return env, nil
+}
+
+// readEnvFile parses KEY=VALUE lines, ignoring blanks and # comments and
+// accepting an optional leading "export " and matching surrounding quotes.
+// A missing file sets nothing.
+func readEnvFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var out []string
+	sc := bufio.NewScanner(f)
+	for n := 1; sc.Scan(); n++ {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		k, v, ok := strings.Cut(line, "=")
+		k = strings.TrimSpace(k)
+		if !ok || !validEnvKey.MatchString(k) {
+			return nil, fmt.Errorf("%s line %d: expected KEY=VALUE", EnvFileName, n)
+		}
+		v = strings.TrimSpace(v)
+		if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
+			v = v[1 : len(v)-1]
+		}
+		out = append(out, k+"="+v)
+	}
+	return out, sc.Err()
 }
 
 // SessionEnv is the environment for a session under account: nil (inherit
-// the caller's own) for the default account, otherwise this process's
-// environment pointed at the account's configuration home.
+// the caller's own) for no account, otherwise this process's environment
+// with the account applied.
 func SessionEnv(account string) ([]string, error) {
 	if account == "" {
 		return nil, nil

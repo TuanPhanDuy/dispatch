@@ -23,7 +23,7 @@ function escapeHtml(s) {
 
 // Sessions under the default account show nothing; others get an @name chip.
 function accountChip(account) {
-  return account ? `<span class="account-chip" title="Claude account: ${escapeHtml(account)}">@${escapeHtml(account)}</span>` : '';
+  return account ? `<span class="account-chip" title="Account: ${escapeHtml(account)}">@${escapeHtml(account)}</span>` : '';
 }
 
 function relTime(iso) {
@@ -801,14 +801,9 @@ function lastAccount() {
   try { return localStorage.getItem(LAST_ACCOUNT_KEY) || ''; } catch { return ''; }
 }
 
-// Accounts only change where Claude Code keeps its login, so the field is
-// shown for the Claude Code agent alone.
+// An account applies to every agent (and to tools started from a shell
+// under it), so the field is always shown.
 function renderAccountField() {
-  const agent = availableAgents.find((a) => a.id === agentSelect.value);
-  const isClaude = !!agent && agent.command === 'claude';
-  accountField.classList.toggle('hidden', !isClaude);
-  if (!isClaude) return;
-
   if (accountsLoading) {
     accountSelect.disabled = true;
     accountNewInput.classList.add('hidden');
@@ -816,20 +811,20 @@ function renderAccountField() {
     return;
   }
   if (knownAccounts === null) {
-    accountSelect.innerHTML = '<option value="">Default (~/.claude)</option>';
+    accountSelect.innerHTML = '<option value="">Default (your usual logins)</option>';
     accountSelect.disabled = true;
     accountNewInput.classList.add('hidden');
-    setAccountHint('Restart the dispatch daemon to run sessions under other Claude accounts.');
+    setAccountHint('Restart the dispatch daemon to run sessions under other accounts.');
     return;
   }
   accountSelect.disabled = false;
   const isNew = accountSelect.value === NEW_ACCOUNT;
   accountNewInput.classList.toggle('hidden', !isNew);
   setAccountHint(isNew
-    ? 'A new account starts logged out — run /login in the session to sign in. Later sessions under it reuse that login.'
+    ? 'A new account starts signed out: sign in once inside the session (Claude Code: /login, Codex: it asks on first run). Later sessions under it stay signed in.'
     : accountSelect.value
-      ? 'Runs with its own Claude login, settings and history.'
-      : 'Your usual Claude Code login.');
+      ? 'Claude Code and Codex use this account\'s own logins, settings and history.'
+      : 'Your usual ~/.claude and ~/.codex logins.');
 }
 
 function setAccountHint(text, isError = false) {
@@ -857,14 +852,13 @@ async function openNewSessionModal({ splitDir = null } = {}) {
   knownAccounts = await accountsReq;
   accountsLoading = false;
   const accounts = knownAccounts || [];
-  accountSelect.innerHTML = '<option value="">Default (~/.claude)</option>'
+  accountSelect.innerHTML = '<option value="">Default (your usual logins)</option>'
     + accounts.map((a) => `<option value="${escapeHtml(a)}">@${escapeHtml(a)}</option>`).join('')
     + `<option value="${NEW_ACCOUNT}">+ New account…</option>`;
   const last = lastAccount();
   accountSelect.value = accounts.includes(last) ? last : '';
   renderAccountField();
 }
-agentSelect.addEventListener('change', renderAccountField);
 accountSelect.addEventListener('change', () => {
   renderAccountField();
   if (accountSelect.value === NEW_ACCOUNT) accountNewInput.focus();
@@ -873,7 +867,6 @@ accountSelect.addEventListener('change', () => {
 // The account the form asks for: '' for the default, or a validated name.
 // Returns null (after flagging the field) when the new name is invalid.
 function chosenAccount() {
-  if (accountField.classList.contains('hidden')) return '';
   if (accountsLoading) { setAccountHint('Still loading accounts — try again in a moment.', true); return null; }
   if (knownAccounts === null) return '';
   if (accountSelect.value !== NEW_ACCOUNT) return accountSelect.value;
@@ -903,7 +896,7 @@ document.getElementById('ns-create').addEventListener('click', async () => {
   modal.classList.add('hidden');
   try {
     const id = await bridge.create({ name, command: agent.command, args: agent.args, cwd, account, cols: 80, rows: 24 });
-    if (agent.command === 'claude') { try { localStorage.setItem(LAST_ACCOUNT_KEY, account); } catch { /* per-viewer nicety only */ } }
+    try { localStorage.setItem(LAST_ACCOUNT_KEY, account); } catch { /* per-viewer nicety only */ }
     recents = await bridge.addRecent({ name, command: agent.command, args: agent.args, cwd, account: account || undefined });
     renderRecentStrip();
     if (pendingSplitDir) openInSplit(id, name, pendingSplitDir);

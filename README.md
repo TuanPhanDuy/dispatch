@@ -92,9 +92,9 @@ The desktop app (see Install, or `cd gui && npm install && npm start` from sourc
 
 Drag a divider to resize. Each pane's PTY is resized to fit it, and panes whose agent has gone idle pulse until you look at them. The layout is restored the next time you open the app.
 
-### Multiple Claude accounts
+### Multiple accounts
 
-Each Claude Code session can run under its own account — its own login, settings and history — so you can be signed in to several Claude accounts side by side. Pick one in the desktop app's **New session** dialog, or add `account: <name>` to a profile for the TUI. See [Multiple Claude accounts](docs/USER_GUIDE.md#multiple-claude-accounts).
+Sessions can run under named accounts, each with its own Claude Code and Codex logins, settings and history — so the same tool can be signed in to several accounts side by side. Pick one in the desktop app's **New session** dialog, or add `account: <name>` to a TUI profile; other tools can get per-account API keys or config homes through the account's `env` file. See [Multiple accounts](docs/USER_GUIDE.md#multiple-accounts).
 
 ## Configuration
 

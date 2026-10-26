@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -12,15 +13,19 @@ import (
 	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
 
-// printConfigDir is a profile whose process prints the CLAUDE_CONFIG_DIR it
-// was started with, then stays alive.
+// printConfigDir is a profile whose process prints the tool homes and the
+// EXTRA variable it was started with, then stays alive.
 func printConfigDir(account string) config.AgentProfile {
 	return config.AgentProfile{
 		Name:    "probe",
 		Command: "sh",
-		Args:    []string{"-c", `echo "CFG=[$CLAUDE_CONFIG_DIR]"; exec cat`},
+		Args:    []string{"-c", `echo "CFG=[$CLAUDE_CONFIG_DIR] CODEX=[$CODEX_HOME] EXTRA=[$EXTRA]"; exec cat`},
 		Account: account,
 	}
+}
+
+func probeLine(claude, codex, extra string) string {
+	return "CFG=[" + claude + "] CODEX=[" + codex + "] EXTRA=[" + extra + "]"
 }
 
 func scrollbackOf(r *Registry, id string) string {
@@ -36,6 +41,8 @@ func TestSessionsRunUnderTheirOwnAccountConfigDir(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(accounts.RootEnv, root)
 	t.Setenv("CLAUDE_CONFIG_DIR", "/inherited/from/daemon")
+	t.Setenv("CODEX_HOME", "/inherited/codex")
+	t.Setenv("EXTRA", "")
 
 	r := NewRegistry(100, 10)
 	defer r.Close()
@@ -54,9 +61,9 @@ func TestSessionsRunUnderTheirOwnAccountConfigDir(t *testing.T) {
 	}
 
 	want := map[string]string{
-		work:     "CFG=[" + filepath.Join(root, "work") + "]",
-		personal: "CFG=[" + filepath.Join(root, "personal") + "]",
-		def:      "CFG=[/inherited/from/daemon]", // no account: environment untouched
+		work:     probeLine(filepath.Join(root, "work", "claude"), filepath.Join(root, "work", "codex"), ""),
+		personal: probeLine(filepath.Join(root, "personal", "claude"), filepath.Join(root, "personal", "codex"), ""),
+		def:      probeLine("/inherited/from/daemon", "/inherited/codex", ""), // no account: environment untouched
 	}
 	for id, line := range want {
 		waitUntil(t, 3*time.Second, func() bool { return strings.Contains(scrollbackOf(r, id), line) })
@@ -71,9 +78,10 @@ func TestSessionsRunUnderTheirOwnAccountConfigDir(t *testing.T) {
 	}
 }
 
-func TestRestartKeepsTheSessionsAccount(t *testing.T) {
+func TestRestartKeepsTheAccountAndPicksUpEnvFileEdits(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(accounts.RootEnv, root)
+	t.Setenv("EXTRA", "")
 
 	r := NewRegistry(100, 10)
 	defer r.Close()
@@ -82,13 +90,18 @@ func TestRestartKeepsTheSessionsAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	want := "CFG=[" + filepath.Join(root, "work") + "]"
-	waitUntil(t, 3*time.Second, func() bool { return strings.Contains(scrollbackOf(r, id), want) })
+	claude, codex := filepath.Join(root, "work", "claude"), filepath.Join(root, "work", "codex")
+	waitUntil(t, 3*time.Second, func() bool { return strings.Contains(scrollbackOf(r, id), probeLine(claude, codex, "")) })
 
+	if err := os.WriteFile(filepath.Join(root, "work", accounts.EnvFileName), []byte("EXTRA=from-env-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := r.Restart(id); err != nil {
 		t.Fatalf("Restart: %v", err)
 	}
-	waitUntil(t, 3*time.Second, func() bool { return strings.Contains(scrollbackOf(r, id), want) })
+	waitUntil(t, 3*time.Second, func() bool {
+		return strings.Contains(scrollbackOf(r, id), probeLine(claude, codex, "from-env-file"))
+	})
 }
 
 func TestCreateRejectsInvalidAccountName(t *testing.T) {
@@ -137,14 +150,15 @@ func TestServerCreatePassesAccountThrough(t *testing.T) {
 	socketPath, registry := startTestServer(t)
 	tc := dialTestClient(t, socketPath)
 
+	t.Setenv("EXTRA", "")
+	p := printConfigDir("work")
 	tc.send(t, protocol.Envelope{Type: protocol.ReqCreate, ID: "c1", Data: protocol.Marshal(protocol.CreateSessionReq{
-		Name: "w", Command: "sh", Args: []string{"-c", `echo "CFG=[$CLAUDE_CONFIG_DIR]"; exec cat`},
-		Cwd: ".", Cols: 80, Rows: 24, Account: "work",
+		Name: "w", Command: p.Command, Args: p.Args, Cwd: ".", Cols: 80, Rows: 24, Account: "work",
 	})})
 	env := tc.recv(t, protocol.RespCreate, 2*time.Second)
 	var created protocol.CreateResp
 	_ = protocol.Unmarshal(env.Data, &created)
 
-	want := "CFG=[" + filepath.Join(root, "work") + "]"
+	want := probeLine(filepath.Join(root, "work", "claude"), filepath.Join(root, "work", "codex"), "")
 	waitUntil(t, 3*time.Second, func() bool { return strings.Contains(scrollbackOf(registry, created.SessionID), want) })
 }

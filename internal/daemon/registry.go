@@ -36,7 +36,6 @@ type session struct {
 	name    string
 	cwd     string
 	profile config.AgentProfile
-	env     []string // nil inherits the daemon's environment
 
 	proc      *ptyproc.Process
 	ring      *ptyproc.RingBuffer
@@ -166,7 +165,6 @@ func (r *Registry) Create(profile config.AgentProfile, name, cwd string, cols, r
 		id:        id,
 		cwd:       cwd,
 		profile:   profile,
-		env:       env,
 		proc:      proc,
 		ring:      ptyproc.NewRingBuffer(r.scrollbackCap),
 		idleTrack: idle.NewTracker(r.idleThreshold(profile)),
@@ -461,11 +459,18 @@ func (r *Registry) Restart(id string) error {
 	}
 
 	s.mu.Lock()
+	// Re-resolved rather than reused, so edits to the account's env file
+	// apply on restart.
+	env, err := accounts.SessionEnv(s.profile.Account)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	if s.proc != nil {
 		_ = s.proc.Kill()
 		_ = s.proc.Close()
 	}
-	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, s.env, 80, 24)
+	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, env, 80, 24)
 	if startErr != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("restart %s: %w", s.profile.Command, startErr)
