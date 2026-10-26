@@ -18,6 +18,18 @@ type Row struct {
 	Live    bool
 	Summary client.SessionSummary
 	Def     config.SessionDef
+	// DefAccount is the account a stopped row's profile would relaunch
+	// under; live rows report their own via Summary.Account.
+	DefAccount string
+}
+
+// Account is the account the row's session runs (or would run) under,
+// empty for the agent's default configuration.
+func (r Row) Account() string {
+	if r.Live {
+		return r.Summary.Account
+	}
+	return r.DefAccount
 }
 
 func (r Row) Name() string {
@@ -205,7 +217,11 @@ func (m *ListModel) View() string {
 			if row.Live {
 				status = string(row.Summary.Status)
 			}
-			line = fmt.Sprintf("%s%-20s %-16s %s", cursor, truncate(row.Name(), 20), status, row.Cwd())
+			account := ""
+			if row.Account() != "" {
+				account = "@" + row.Account()
+			}
+			line = fmt.Sprintf("%s%-20s %-16s %-14s %s", cursor, truncate(row.Name(), 20), status, truncate(account, 14), row.Cwd())
 		}
 
 		switch {

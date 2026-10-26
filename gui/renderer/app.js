@@ -21,6 +21,11 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Sessions under the default account show nothing; others get an @name chip.
+function accountChip(account) {
+  return account ? `<span class="account-chip" title="Account: ${escapeHtml(account)}">@${escapeHtml(account)}</span>` : '';
+}
+
 function relTime(iso) {
   const d = (Date.now() - new Date(iso).getTime()) / 1000;
   if (d < 60) return 'started just now';
@@ -85,7 +90,7 @@ function rowHtml(s, { showCwd = true } = {}) {
     <div class="${rowCls}" data-id="${s.id}">
       <div class="cell-name"><span class="name">${escapeHtml(s.name)}</span><span class="agent-sub">${relTime(s.started_at)}</span></div>
       <div>${statusBadge(s.status)}</div>
-      <div class="cell-agent">${escapeHtml(s.command)}</div>
+      <div class="cell-agent">${escapeHtml(s.command)}${accountChip(s.account)}</div>
       <div class="cell-cwd">${showCwd ? escapeHtml(s.cwd) : '&nbsp;'}</div>
       <div class="cell-actions">${actions}</div>
     </div>`;
@@ -224,7 +229,7 @@ function renderRecentStrip() {
   recentStrip.classList.toggle('hidden', recents.length === 0);
   recentStrip.innerHTML = recents.map((r) => `
     <div class="recent-pill" data-recent="${escapeHtml(r.name)}">
-      <span class="pdot"></span>${escapeHtml(r.name)}${RESTART_ICON}
+      <span class="pdot"></span>${escapeHtml(r.name)}${accountChip(r.account)}${RESTART_ICON}
     </div>`).join('');
 }
 recentStrip.addEventListener('click', (e) => {
@@ -236,7 +241,7 @@ recentStrip.addEventListener('click', (e) => {
 
 async function relaunchRecent(entry, splitDir = null) {
   try {
-    const id = await bridge.create({ name: entry.name, command: entry.command, args: entry.args, cwd: entry.cwd, cols: 80, rows: 24 });
+    const id = await bridge.create({ name: entry.name, command: entry.command, args: entry.args, cwd: entry.cwd, account: entry.account, cols: 80, rows: 24 });
     if (splitDir) openInSplit(id, entry.name, splitDir);
     else openOrActivateTab(id, entry.name);
   } catch (err) {
@@ -367,6 +372,7 @@ async function createTab(id, name) {
     <div class="term-head">
       <span class="pane-dot"></span>
       <span class="pane-label">${escapeHtml(name)}</span>
+      <span class="pane-account"></span>
       <span class="pane-status"></span>
       <span class="pane-actions">
         <button class="pane-btn" data-pane-act="split-row" title="Split right (&#8984;D)">${SPLIT_ROW_ICON}</button>
@@ -576,6 +582,7 @@ function updatePaneHeads() {
     const s = lastSessions.find((x) => x.id === id);
     const status = s ? s.status : 'exited';
     tab.container.querySelector('.pane-dot').className = `pane-dot ${statusDotClass(status)}`;
+    tab.container.querySelector('.pane-account').innerHTML = accountChip(s && s.account);
     tab.container.querySelector('.pane-status').textContent =
       status === 'running' ? 'running' : status === 'needs-attention' ? 'needs input' : 'exited';
     tab.container.classList.toggle('focused', tiled && id === activeTabId);
@@ -605,6 +612,7 @@ function renderTabs() {
     el.innerHTML = `
       <span class="tab-dot ${statusDotClass(status)}"></span>
       <span class="tab-name">${escapeHtml(tab.name)}</span>
+      ${accountChip(s && s.account)}
       ${i <= 9 ? `<span class="tab-kbd">&#8984;${i}</span>` : ''}
       <span class="tab-actions">
         ${isVisible(id) ? '' : `<button class="tab-icon-btn" data-split="${id}" title="Open in a split to the right">${SPLIT_ROW_ICON}</button>`}
@@ -650,11 +658,11 @@ function paletteEntries() {
   if (paletteSplitDir) entries.push({ kind: 'new', name: 'New session…', path: 'launch into the new pane' });
   for (const s of lastSessions) {
     if (paletteSplitDir && s.id === activeTabId) continue; // can't split a pane with itself
-    entries.push({ kind: 'session', id: s.id, name: s.name, path: s.cwd, status: s.status });
+    entries.push({ kind: 'session', id: s.id, name: s.name, path: s.account ? `@${s.account} · ${s.cwd}` : s.cwd, status: s.status });
     seen.add(s.name);
   }
   for (const r of recents) {
-    if (!seen.has(r.name)) entries.push({ kind: 'recent', name: r.name, path: `${r.cwd} · relaunch`, entry: r });
+    if (!seen.has(r.name)) entries.push({ kind: 'recent', name: r.name, path: `${r.account ? `@${r.account} · ` : ''}${r.cwd} · relaunch`, entry: r });
   }
   return entries;
 }
@@ -775,20 +783,102 @@ const modal = document.getElementById('new-session-modal');
 const nameInput = document.getElementById('ns-name');
 const agentSelect = document.getElementById('ns-agent');
 const cwdInput = document.getElementById('ns-cwd');
+const accountField = document.getElementById('ns-account-field');
+const accountSelect = document.getElementById('ns-account');
+const accountNewInput = document.getElementById('ns-account-new');
+const accountHint = document.getElementById('ns-account-hint');
 let availableAgents = [];
+let knownAccounts = null; // null: the daemon predates accounts
+let accountsLoading = false;
 let pendingSplitDir = null; // set when the modal was opened to fill a new pane
+
+const NEW_ACCOUNT = '__new__';
+const LAST_ACCOUNT_KEY = 'dispatch.lastAccount';
+// Mirrors internal/accounts.Validate.
+const ACCOUNT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
+
+function lastAccount() {
+  try { return localStorage.getItem(LAST_ACCOUNT_KEY) || ''; } catch { return ''; }
+}
+
+// An account applies to every agent (and to tools started from a shell
+// under it), so the field is always shown.
+function renderAccountField() {
+  if (accountsLoading) {
+    accountSelect.disabled = true;
+    accountNewInput.classList.add('hidden');
+    setAccountHint('Loading accounts…');
+    return;
+  }
+  if (knownAccounts === null) {
+    accountSelect.innerHTML = '<option value="">Default (your usual logins)</option>';
+    accountSelect.disabled = true;
+    accountNewInput.classList.add('hidden');
+    setAccountHint('Restart the dispatch daemon to run sessions under other accounts.');
+    return;
+  }
+  accountSelect.disabled = false;
+  const isNew = accountSelect.value === NEW_ACCOUNT;
+  accountNewInput.classList.toggle('hidden', !isNew);
+  setAccountHint(isNew
+    ? 'A new account starts signed out: sign in once inside the session (Claude Code: /login, Codex: it asks on first run). Later sessions under it stay signed in.'
+    : accountSelect.value
+      ? 'Claude Code and Codex use this account\'s own logins, settings and history.'
+      : 'Your usual ~/.claude and ~/.codex logins.');
+}
+
+function setAccountHint(text, isError = false) {
+  accountHint.textContent = text;
+  accountHint.classList.toggle('is-error', isError);
+}
 
 async function openNewSessionModal({ splitDir = null } = {}) {
   pendingSplitDir = splitDir;
   nameInput.value = '';
+  accountNewInput.value = '';
   cwdInput.value = await bridge.homeDir();
+  // Accounts load in the background: a daemon that predates them only
+  // answers after a timeout, and the dialog shouldn't wait on that.
+  const accountsReq = bridge.listAccounts();
+  accountsLoading = true;
   availableAgents = await bridge.detectAgents();
   agentSelect.innerHTML = availableAgents.length
     ? availableAgents.map((a) => `<option value="${a.id}">${escapeHtml(a.label)}</option>`).join('')
     : '<option disabled>No agent CLIs found on PATH</option>';
+  renderAccountField();
   modal.classList.remove('hidden');
   nameInput.focus();
+
+  knownAccounts = await accountsReq;
+  accountsLoading = false;
+  const accounts = knownAccounts || [];
+  accountSelect.innerHTML = '<option value="">Default (your usual logins)</option>'
+    + accounts.map((a) => `<option value="${escapeHtml(a)}">@${escapeHtml(a)}</option>`).join('')
+    + `<option value="${NEW_ACCOUNT}">+ New account…</option>`;
+  const last = lastAccount();
+  accountSelect.value = accounts.includes(last) ? last : '';
+  renderAccountField();
 }
+accountSelect.addEventListener('change', () => {
+  renderAccountField();
+  if (accountSelect.value === NEW_ACCOUNT) accountNewInput.focus();
+});
+
+// The account the form asks for: '' for the default, or a validated name.
+// Returns null (after flagging the field) when the new name is invalid.
+function chosenAccount() {
+  if (accountsLoading) { setAccountHint('Still loading accounts — try again in a moment.', true); return null; }
+  if (knownAccounts === null) return '';
+  if (accountSelect.value !== NEW_ACCOUNT) return accountSelect.value;
+  const name = accountNewInput.value.trim();
+  if (!ACCOUNT_NAME.test(name)) {
+    setAccountHint("Use 1–40 letters, digits, '.', '_' or '-', starting with a letter or digit.", true);
+    accountNewInput.focus();
+    return null;
+  }
+  return name;
+}
+
 document.getElementById('btn-new').addEventListener('click', () => openNewSessionModal());
 document.getElementById('btn-new-empty').addEventListener('click', () => openNewSessionModal());
 document.getElementById('ns-browse').addEventListener('click', async () => {
@@ -801,10 +891,13 @@ document.getElementById('ns-create').addEventListener('click', async () => {
   const agent = availableAgents.find((a) => a.id === agentSelect.value);
   const cwd = cwdInput.value.trim();
   if (!name || !agent) { alert('Name and agent are required.'); return; }
+  const account = chosenAccount();
+  if (account === null) return;
   modal.classList.add('hidden');
   try {
-    const id = await bridge.create({ name, command: agent.command, args: agent.args, cwd, cols: 80, rows: 24 });
-    recents = await bridge.addRecent({ name, command: agent.command, args: agent.args, cwd });
+    const id = await bridge.create({ name, command: agent.command, args: agent.args, cwd, account, cols: 80, rows: 24 });
+    try { localStorage.setItem(LAST_ACCOUNT_KEY, account); } catch { /* per-viewer nicety only */ }
+    recents = await bridge.addRecent({ name, command: agent.command, args: agent.args, cwd, account: account || undefined });
     renderRecentStrip();
     if (pendingSplitDir) openInSplit(id, name, pendingSplitDir);
     else openOrActivateTab(id, name);

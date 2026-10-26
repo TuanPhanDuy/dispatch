@@ -10,6 +10,7 @@ Tài liệu này hướng dẫn cài đặt, cách dùng hằng ngày cho cả h
 - [Cài đặt](#install)
 - [Ứng dụng desktop](#desktop-app)
 - [Giao diện terminal (TUI)](#tui)
+- [Nhiều account](#multiple-accounts)
 - [Cấu hình](#configuration)
 - [Cập nhật](#updating)
 - [Xử lý sự cố](#troubleshooting)
@@ -165,6 +166,102 @@ Mọi phím bạn gõ đều được gửi tới agent. Phím duy nhất đư�
 
 TUI chỉ hiện một session tại một thời điểm. Dùng ứng dụng desktop nếu bạn muốn xem nhiều session cạnh nhau.
 
+<a id="multiple-accounts"></a>
+## Nhiều account
+
+Session có thể chạy dưới các **account** có tên, nhờ đó cùng một tool có thể đăng nhập nhiều account cạnh nhau — ví dụ Claude Code với gói cá nhân ở pane này, Claude Code với gói công ty ở pane bên cạnh, và Codex với một account thứ ba ở bên dưới.
+
+Account là một danh tính riêng cho các CLI agent. Với mỗi tool được hỗ trợ, nó giữ login, settings, lịch sử và các file cấp người dùng riêng của tool đó — tức là mọi thứ bình thường nằm trong `~/.claude` hoặc `~/.codex`. File của project, như thư mục `.claude/` trong repo hay `AGENTS.md`, vẫn dùng chung vì chúng thuộc về project. Session nào không chọn account thì vẫn dùng login quen thuộc của bạn.
+
+> Hãy dùng account để tách những danh tính thật sự khác nhau, như cá nhân và công việc. Chia công việc của một người ra nhiều account để lách giới hạn sử dụng của gói có thể vi phạm điều khoản của nhà cung cấp tool; hãy tự kiểm tra cho trường hợp của bạn.
+
+### Tool được hỗ trợ
+
+| Tool | Tách riêng theo account | Cách làm |
+|---|---|---|
+| Claude Code | login, settings, lịch sử, MCP server, `CLAUDE.md` cấp người dùng | `CLAUDE_CONFIG_DIR` → `<account>/claude` |
+| Codex CLI | login (`auth.json` hoặc keychain), `config.toml`, lịch sử | `CODEX_HOME` → `<account>/codex` |
+| Tool khác | những gì bạn ghi trong file `env` của account | xem [Tool khác](#other-tools) |
+
+Cả hai biến được đặt cho **mọi** session dưới account, dù session chạy agent nào. Vì vậy một session **Shell** dưới `work` cũng chạy `claude` và `codex` với account `work` — tiện cho những tool bạn tự gõ lệnh.
+
+<a id="signing-in-to-several-accounts"></a>
+### Đăng nhập nhiều account
+
+Mỗi account cần được đăng nhập một lần cho mỗi tool. Sau đó, mọi session bạn mở dưới account đó đều đã đăng nhập sẵn, nên bạn có thể chạy bao nhiêu session cho một account cũng được.
+
+1. **Tạo session cho account đầu tiên.** Bấm **+ New session**, chọn agent (ví dụ Claude Code), đặt **Account** là **+ New account…**, nhập tên như `personal`, rồi bấm **Create session**.
+2. **Đăng nhập ngay trong session đó.**
+   - *Claude Code* khởi động như vừa cài mới: chọn theme, rồi chọn cách đăng nhập. Nó mở trình duyệt; hãy đăng nhập bằng account bạn muốn dùng cho `personal`. Muốn đăng nhập lại sau này thì gõ `/login`.
+   - *Codex* hỏi đăng nhập ở lần chạy đầu: chọn **Sign in with ChatGPT** (mở trình duyệt) hoặc dán API key. Bạn cũng có thể chạy `codex login` trong một session **Shell** dưới account đó.
+3. **Lặp lại cho account tiếp theo**, ví dụ account mới `work`, đăng nhập bằng danh tính công việc.
+4. **Mở thêm session.** Chọn **@personal** hoặc **@work** ở ô **Account**, session sẽ khởi động với trạng thái đã đăng nhập. Restart giữ nguyên account, và dải khởi chạy gần đây cũng chạy lại đúng account đó.
+
+**Mẹo trình duyệt:** bước đăng nhập qua trình duyệt dùng account Claude hoặc ChatGPT mà trình duyệt đang đăng nhập. Trước khi đăng nhập một account, hãy chắc trình duyệt đang ở đúng danh tính — cách dễ nhất là dùng một profile trình duyệt riêng cho mỗi account (dán link đăng nhập vào profile đó), hoặc đăng xuất khỏi claude.ai / chatgpt.com trước.
+
+Muốn biết một session đang đăng nhập account nào, dùng lệnh trạng thái của chính tool đó, ví dụ `/status` trong Claude Code hoặc `/status` trong Codex.
+
+### Biết session đang dùng account nào
+
+Session dưới một account có chip **@tên** trong danh sách session, trên tab, trên đầu pane và trong palette ⌘K. Session không có chip thì dùng login quen thuộc của bạn.
+
+### Trong giao diện terminal
+
+Thêm vào [config.yaml](#configuration) một profile có `account` cho mỗi tổ hợp bạn cần:
+
+```yaml
+profiles:
+  - name: claude-work
+    command: claude
+    account: work
+  - name: claude-personal
+    command: claude
+    account: personal
+  - name: codex-work
+    command: codex
+    account: work
+```
+
+Chọn profile đó trong wizard **New session**. Danh sách session hiện account bên cạnh trạng thái của từng session. TUI và ứng dụng desktop dùng chung account: `account: work` chính là **@work** trong ứng dụng desktop, với cùng các login.
+
+<a id="other-tools"></a>
+### Tool khác
+
+Mỗi account có một file `env` (được tạo sẵn kèm ví dụ dạng comment); các dòng `KEY=VALUE` trong đó được thêm vào mọi session dưới account. Dùng nó cho:
+
+- **API key**, với các tool đăng nhập bằng key, như Aider:
+
+  ```sh
+  OPENAI_API_KEY=sk-...
+  ANTHROPIC_API_KEY=sk-ant-...
+  ```
+
+- **Thư mục cấu hình của tool khác**, nếu tool đó có. Ví dụ Gemini CLI đọc `GEMINI_CLI_HOME`:
+
+  ```sh
+  GEMINI_CLI_HOME=/Users/ban/Library/Application Support/dispatch/accounts/work/gemini
+  ```
+
+  Việc này có tách được cả *login* của tool hay không thì tuỳ tool — nếu tool lưu thông tin đăng nhập ở chỗ dùng chung như keychain hệ thống, các account có thể vẫn dùng chung một login. Hãy xem tài liệu của tool đó.
+
+Dòng bắt đầu bằng `#` được bỏ qua, cho phép có `export ` ở đầu và dấu nháy bao quanh giá trị. Thay đổi có hiệu lực với session được khởi động hoặc restart sau đó. Dòng sai cú pháp sẽ khiến session không khởi động được, và thông báo lỗi chỉ ra dòng đó.
+
+<a id="where-accounts-live"></a>
+### Account được lưu ở đâu
+
+| Hệ điều hành | Thư mục |
+|---|---|
+| macOS | `~/Library/Application Support/dispatch/accounts/<tên>` |
+| Linux | `~/.local/share/dispatch/accounts/<tên>` (hoặc `$XDG_DATA_HOME/dispatch/accounts/<tên>`) |
+
+Bên trong có `claude/`, `codex/` và `env`. Thư mục chỉ user của bạn truy cập được; file `env` có thể chứa thông tin bí mật, đừng chia sẻ nó.
+
+<a id="removing-an-account"></a>
+### Xoá một account
+
+1. Đăng xuất từng tool trong một session dưới account đó — `/logout` trong Claude Code, `codex logout` trong một session Shell — để các mục trong keychain cũng bị xoá.
+2. Xoá thư mục của nó, ví dụ `rm -rf ~/Library/Application\ Support/dispatch/accounts/work`.
+
 <a id="configuration"></a>
 ## Cấu hình
 
@@ -187,11 +284,14 @@ profiles:                       # các lựa chọn trong wizard New session c�
     args: ["--full-auto"]
   - name: shell
     command: zsh
+  - name: claude-work
+    command: claude
+    account: work               # chạy dưới một account riêng
 
 sessions: []                    # dispatch tự ghi; xem bên dưới
 ```
 
-- **profiles** là các mẫu. Bạn có thể thêm profile cho bất kỳ CLI nào, kèm tham số.
+- **profiles** là các mẫu. Bạn có thể thêm profile cho bất kỳ CLI nào, kèm tham số. `account` cho session của profile chạy dưới một [account riêng](#multiple-accounts).
 - **sessions** do dispatch tự quản lý: mỗi session bạn tạo hoặc đổi tên được lưu với tên, profile và thư mục, nên nó vẫn còn trong danh sách sau khi thoát và có thể khởi chạy lại bằng `enter`.
 
 Ứng dụng desktop không dùng profiles. Hộp thoại **New session** của nó đưa ra Claude Code, Codex và Aider nếu chúng đã được cài, cùng với login shell của bạn, và nó giữ danh sách khởi chạy gần đây riêng.
@@ -230,6 +330,15 @@ dispatch kết nối tới daemon qua socket tại `$XDG_RUNTIME_DIR/dispatch.so
 **Trong ứng dụng desktop, mở nhiều tab nhưng chỉ một tab cập nhật.**
 Daemon của bạn cũ hơn v0.2.0, khi đó mỗi cửa sổ chỉ nhận output của một session. Hãy khởi động lại daemon (xem [Cập nhật](#updating)).
 
+**Ô Account bị mờ và nhắc khởi động lại daemon.**
+Daemon của bạn cũ hơn bản hỗ trợ account (v0.4.0). Hãy khởi động lại nó (xem [Cập nhật](#updating)). Trước khi khởi động lại, session sẽ chạy bằng login mặc định.
+
+**Session dưới một account lần nào cũng bắt đăng nhập.**
+Account đó chưa được đăng nhập vào tool đó: đăng nhập một lần (xem [Đăng nhập nhiều account](#signing-in-to-several-accounts)), các session sau dưới account đó sẽ dùng lại login. Nếu vẫn bị hỏi mãi, kiểm tra thư mục của account còn tồn tại không (xem [Account được lưu ở đâu](#where-accounts-live)).
+
+**Session dưới một account không khởi động được, báo "env line N: expected KEY=VALUE".**
+Sửa dòng đó trong file `env` của account (xem [Tool khác](#other-tools)), rồi khởi động hoặc restart session.
+
 **Báo "Needs attention" trong khi agent vẫn đang làm.**
 Một số agent suy nghĩ khá lâu mà không in gì. Hãy tăng `idle_attention_seconds` cho profile đó.
 
@@ -243,6 +352,8 @@ Daemon đã bị dừng: do khởi động lại, crash, đăng xuất hoặc kh
 pkill -f "dispatch daemon"                          # kết thúc mọi session
 rm -rf /Applications/dispatch.app                   # ứng dụng desktop
 sudo rm -f /usr/local/bin/dispatch                  # giao diện terminal
-rm -rf ~/Library/Application\ Support/dispatch      # cài đặt, khởi chạy gần đây, bố cục pane trên macOS
-rm -rf ~/.config/dispatch                           # cài đặt trên Linux
+rm -rf ~/Library/Application\ Support/dispatch      # cài đặt, khởi chạy gần đây, bố cục pane, account trên macOS
+rm -rf ~/.config/dispatch ~/.local/share/dispatch   # cài đặt và account trên Linux
 ```
+
+Nếu bạn có dùng [account](#multiple-accounts), hãy đăng xuất từng tool dưới mỗi account trước (xem [Xoá một account](#removing-an-account)), để các mục trong keychain cũng bị xoá.

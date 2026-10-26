@@ -121,7 +121,11 @@ func (m *NewSessionModel) View() string {
 			if i == m.cursor {
 				cursor = "> "
 			}
-			fmt.Fprintf(&b, "%s%s (%s %s)\n", cursor, p.Name, p.Command, strings.Join(p.Args, " "))
+			account := ""
+			if p.Account != "" {
+				account = " @" + p.Account
+			}
+			fmt.Fprintf(&b, "%s%s (%s)%s\n", cursor, p.Name, strings.TrimSpace(p.Command+" "+strings.Join(p.Args, " ")), account)
 		}
 		return b.String()
 	case stepName:

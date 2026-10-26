@@ -152,6 +152,7 @@ func toClientSummaries(in []protocol.SessionSummary) []SessionSummary {
 			Cwd:       s.Cwd,
 			Status:    SessionStatus(s.Status),
 			StartedAt: s.StartedAt,
+			Account:   s.Account,
 		}
 	}
 	return out
@@ -247,6 +248,7 @@ func (m *SocketManager) List() ([]SessionSummary, error) {
 func (m *SocketManager) Create(profile config.AgentProfile, name, cwd string, cols, rows int) (string, error) {
 	resp, err := m.call(protocol.ReqCreate, protocol.CreateSessionReq{
 		Name: name, Command: profile.Command, Args: profile.Args, Cwd: cwd, Cols: cols, Rows: rows,
+		Account: profile.Account,
 	})
 	if err != nil {
 		return "", err

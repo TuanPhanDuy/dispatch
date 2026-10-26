@@ -10,6 +10,7 @@ This guide covers installing, day-to-day use of both clients, configuration, upd
 - [Install](#install)
 - [The desktop app](#the-desktop-app)
 - [The terminal UI](#the-terminal-ui)
+- [Multiple accounts](#multiple-accounts)
 - [Configuration](#configuration)
 - [Updating](#updating)
 - [Troubleshooting](#troubleshooting)
@@ -161,6 +162,97 @@ Everything you type goes to the agent. The only reserved key is `ctrl+\`, which 
 
 The TUI shows one session at a time. Use the desktop app if you want several side by side.
 
+## Multiple accounts
+
+Sessions can run under named **accounts**, so the same tool can be signed in to different accounts side by side — say Claude Code on your personal plan in one pane, Claude Code on your company's plan in the next, and Codex on a third account below them.
+
+An account is a separate identity for your agent CLIs. For each supported tool it holds that tool's own login, settings, history and other user-level files — everything that normally lives in `~/.claude` or `~/.codex`. Project files, such as a repository's `.claude/` folder or `AGENTS.md`, are still shared, because they belong to the project. Sessions that don't pick an account keep using your usual logins.
+
+> Use accounts to keep genuinely separate identities apart, such as personal and work. Spreading one person's work over several accounts to get around a plan's usage limits may break the tool provider's terms; check them for your situation.
+
+### Supported tools
+
+| Tool | Kept per account | How |
+|---|---|---|
+| Claude Code | login, settings, history, MCP servers, user `CLAUDE.md` | `CLAUDE_CONFIG_DIR` → `<account>/claude` |
+| Codex CLI | login (`auth.json` or keychain), `config.toml`, history | `CODEX_HOME` → `<account>/codex` |
+| Anything else | whatever you put in the account's `env` file | see [Other tools](#other-tools) |
+
+Both variables are set for **every** session under the account, whatever agent it starts. So a **Shell** session under `work` also runs `claude` and `codex` as `work` — handy for tools you launch by hand.
+
+### Signing in to several accounts
+
+Each account needs to be signed in once per tool. After that, every session you open under it is already signed in, so you can run as many sessions per account as you like.
+
+1. **Create the first account's session.** Click **+ New session**, choose the agent (for example Claude Code), set **Account** to **+ New account…**, type a name such as `personal`, and click **Create session**.
+2. **Sign in inside that session.**
+   - *Claude Code* starts like a fresh install: pick a theme, then choose how to log in. It opens your browser; sign in with the account you want for `personal`. To sign in again later, type `/login`.
+   - *Codex* asks you to sign in the first time it runs: choose **Sign in with ChatGPT** (opens the browser) or paste an API key. You can also run `codex login` from a **Shell** session under the account.
+3. **Repeat for the next account**, e.g. a new account `work`, signing in with your work identity.
+4. **Open more sessions.** Pick **@personal** or **@work** in the **Account** field and they start already signed in. Restarting a session keeps its account, and recent launches relaunch under the same one.
+
+**Browser tip:** the browser sign-in uses whatever Claude or ChatGPT account the browser is currently logged in to. Before signing in an account, make sure the browser is on the right identity — the easiest way is a separate browser profile per account (copy the sign-in link into it), or signing out of claude.ai / chatgpt.com first.
+
+To check which account a session is signed in as, use the tool's own status command, e.g. `/status` in Claude Code or `/status` in Codex.
+
+### Seeing which account a session uses
+
+Sessions under an account carry an **@name** chip in the session list, on their tab, on their pane header and in the ⌘K palette. Sessions without a chip use your usual logins.
+
+### In the terminal UI
+
+Add a profile with an `account` to your [config.yaml](#configuration) for each combination you want:
+
+```yaml
+profiles:
+  - name: claude-work
+    command: claude
+    account: work
+  - name: claude-personal
+    command: claude
+    account: personal
+  - name: codex-work
+    command: codex
+    account: work
+```
+
+Pick the profile in the **New session** wizard. The session list shows the account next to each session's status. The TUI and the desktop app share accounts: `account: work` is the same as **@work** in the desktop app, with the same logins.
+
+### Other tools
+
+Each account has an `env` file (created with commented examples) whose `KEY=VALUE` lines are added to every session under that account. Use it for:
+
+- **API keys**, for tools that sign in with one, such as Aider:
+
+  ```sh
+  OPENAI_API_KEY=sk-...
+  ANTHROPIC_API_KEY=sk-ant-...
+  ```
+
+- **Another tool's configuration home**, if it has one. For example Gemini CLI reads `GEMINI_CLI_HOME`:
+
+  ```sh
+  GEMINI_CLI_HOME=/Users/you/Library/Application Support/dispatch/accounts/work/gemini
+  ```
+
+  Whether that also separates the tool's *login* depends on the tool — if it keeps credentials in a shared place such as the system keychain, accounts may still share one. Check the tool's documentation.
+
+Lines starting with `#` are ignored, `export ` and surrounding quotes are allowed. Changes apply to sessions started or restarted afterwards. A malformed line stops the session from starting and the error names the line.
+
+### Where accounts live
+
+| OS | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/dispatch/accounts/<name>` |
+| Linux | `~/.local/share/dispatch/accounts/<name>` (or `$XDG_DATA_HOME/dispatch/accounts/<name>`) |
+
+Inside: `claude/`, `codex/` and `env`. The folder is private to your user; the `env` file may hold secrets, so don't share it.
+
+### Removing an account
+
+1. Sign out of each tool in a session under that account — `/logout` in Claude Code, `codex logout` in a Shell session — so any keychain entries go too.
+2. Delete its folder, e.g. `rm -rf ~/Library/Application\ Support/dispatch/accounts/work`.
+
 ## Configuration
 
 The terminal UI reads `config.yaml`, creating it with defaults on first run:
@@ -182,11 +274,14 @@ profiles:                       # what the TUI's New session wizard offers
     args: ["--full-auto"]
   - name: shell
     command: zsh
+  - name: claude-work
+    command: claude
+    account: work               # run under a separate account
 
 sessions: []                    # written automatically; see below
 ```
 
-- **profiles** are templates. Add one for any CLI you like, with its arguments.
+- **profiles** are templates. Add one for any CLI you like, with its arguments. `account` runs its sessions under a [separate account](#multiple-accounts).
 - **sessions** is maintained by dispatch: each session you create or rename is saved with its name, profile, and directory, so it stays in the list after it exits and can be relaunched with `enter`.
 
 The desktop app doesn't use profiles. Its **New session** dialog offers Claude Code, Codex, and Aider when they're installed, plus your login shell, and it keeps its own list of recent launches.
@@ -223,6 +318,15 @@ dispatch talks to the daemon over a socket at `$XDG_RUNTIME_DIR/dispatch.sock` i
 **In the desktop app, only one of several open tabs updates.**
 Your daemon predates v0.2.0, which could only stream one session per window. Restart it (see [Updating](#updating)).
 
+**The Account field is greyed out, saying to restart the daemon.**
+Your daemon predates accounts (v0.4.0). Restart it (see [Updating](#updating)). Until then, sessions run under your default login.
+
+**A session under an account asks me to sign in every time.**
+That account hasn't been signed in to that tool yet: sign in once (see [Signing in to several accounts](#signing-in-to-several-accounts)) and later sessions under it reuse the login. If it keeps asking, check that the account's folder still exists (see [Where accounts live](#where-accounts-live)).
+
+**A session under an account fails to start with "env line N: expected KEY=VALUE".**
+Fix that line in the account's `env` file (see [Other tools](#other-tools)), then start or restart the session.
+
 **"Needs attention" fires while the agent is still working.**
 Some agents think silently for long stretches. Raise `idle_attention_seconds` for that profile.
 
@@ -235,6 +339,8 @@ The daemon was stopped: by a restart, a crash, logging out, or rebooting. Sessio
 pkill -f "dispatch daemon"                          # ends all sessions
 rm -rf /Applications/dispatch.app                   # desktop app
 sudo rm -f /usr/local/bin/dispatch                  # terminal UI
-rm -rf ~/Library/Application\ Support/dispatch      # macOS settings, recents, saved layout
-rm -rf ~/.config/dispatch                           # Linux settings
+rm -rf ~/Library/Application\ Support/dispatch      # macOS settings, recents, layout, accounts
+rm -rf ~/.config/dispatch ~/.local/share/dispatch   # Linux settings and accounts
 ```
+
+If you used [accounts](#multiple-accounts), sign out of each tool under each account first (see [Removing an account](#removing-an-account)), so their keychain entries go too.

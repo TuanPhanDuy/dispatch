@@ -159,7 +159,8 @@ func (m *AppModel) mergedRows(live []client.SessionSummary) []Row {
 		if s, ok := byName[def.Name]; ok {
 			rows = append(rows, Row{Live: true, Summary: s, Def: def})
 		} else {
-			rows = append(rows, Row{Live: false, Def: def})
+			profile, _ := m.cfg.Profile(def.Profile)
+			rows = append(rows, Row{Live: false, Def: def, DefAccount: profile.Account})
 		}
 		seen[def.Name] = true
 	}

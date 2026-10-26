@@ -24,6 +24,7 @@ const MsgType = {
   ReqRestart: 'req.restart',
   ReqRename: 'req.rename',
   ReqRemove: 'req.remove',
+  ReqAccounts: 'req.accounts',
   RespOK: 'resp.ok',
   RespError: 'resp.error',
   RespList: 'resp.list',
@@ -265,13 +266,13 @@ class SocketClient {
     this.sock.write(JSON.stringify(env) + '\n');
   }
 
-  call(type, data) {
+  call(type, data, timeoutMs = CALL_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error('timed out waiting for daemon response'));
-      }, CALL_TIMEOUT_MS);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       this._writeEnvelope({ type, id, data });
     });
@@ -282,9 +283,21 @@ class SocketClient {
     return (resp.data && resp.data.sessions) || [];
   }
 
-  async create({ name, command, args, cwd, cols, rows }) {
-    const resp = await this.call(MsgType.ReqCreate, { name, command, args: args || [], cwd, cols, rows });
+  async create({ name, command, args, cwd, cols, rows, account }) {
+    const resp = await this.call(MsgType.ReqCreate, { name, command, args: args || [], cwd, cols, rows, account: account || undefined });
     return resp.data.session_id;
+  }
+
+  // Resolves null (not an empty list) when the daemon predates accounts:
+  // such a daemon would silently ignore `account` on create and run the
+  // session under the default login, so the UI must not offer the choice.
+  async accounts() {
+    try {
+      const resp = await this.call(MsgType.ReqAccounts, null, 2000);
+      return (resp.data && resp.data.accounts) || [];
+    } catch {
+      return null;
+    }
   }
 
   async attach(sessionId, cols, rows, onOutput) {
@@ -374,6 +387,7 @@ function createWindow() {
 function registerIpcHandlers() {
   ipcMain.handle('list', () => client.list());
   ipcMain.handle('create', (_e, opts) => client.create(opts));
+  ipcMain.handle('listAccounts', () => client.accounts());
   ipcMain.handle('attach', async (_e, { sessionId, cols, rows }) => {
     const scrollback = await client.attach(sessionId, cols, rows, (ev) => {
       if (!mainWindow) return;

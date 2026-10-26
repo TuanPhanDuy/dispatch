@@ -25,6 +25,7 @@ type SessionSummary struct {
 	Status    SessionStatus
 	StartedAt time.Time
 	ExitCode  *int
+	Account   string // empty: the agent's default configuration
 }
 
 // OutputChunk is a batch of raw PTY output bytes pushed to an attached

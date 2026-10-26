@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/TuanPhanDuy/dispatch/internal/accounts"
 	"github.com/TuanPhanDuy/dispatch/internal/client"
 	"github.com/TuanPhanDuy/dispatch/internal/config"
 	"github.com/TuanPhanDuy/dispatch/internal/idle"
@@ -124,7 +125,11 @@ func (m *Manager) uniqueNameLocked(name string) string {
 }
 
 func (m *Manager) Create(profile config.AgentProfile, name, cwd string, cols, rows int) (string, error) {
-	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, nil, cols, rows)
+	env, err := accounts.SessionEnv(profile.Account)
+	if err != nil {
+		return "", err
+	}
+	proc, err := ptyproc.Start(profile.Command, profile.Args, cwd, env, cols, rows)
 	if err != nil {
 		return "", fmt.Errorf("spawn %s: %w", profile.Command, err)
 	}
@@ -277,6 +282,7 @@ func (m *Manager) List() ([]client.SessionSummary, error) {
 			Status:    s.status,
 			StartedAt: s.startedAt,
 			ExitCode:  s.exitCode,
+			Account:   s.profile.Account,
 		})
 		s.mu.Unlock()
 	}
@@ -440,11 +446,16 @@ func (m *Manager) Restart(id string) error {
 	}
 
 	s.mu.Lock()
+	env, err := accounts.SessionEnv(s.profile.Account)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	if s.proc != nil {
 		_ = s.proc.Kill()
 		_ = s.proc.Close()
 	}
-	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, nil, 80, 24)
+	proc, startErr := ptyproc.Start(s.profile.Command, s.profile.Args, s.cwd, env, 80, 24)
 	if startErr != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("restart %s: %w", s.profile.Command, startErr)

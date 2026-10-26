@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('dispatch', {
   list: () => ipcRenderer.invoke('list'),
   create: (opts) => ipcRenderer.invoke('create', opts),
+  listAccounts: () => ipcRenderer.invoke('listAccounts'),
   attach: (sessionId, cols, rows) => ipcRenderer.invoke('attach', { sessionId, cols, rows }),
   detach: (sessionId) => ipcRenderer.invoke('detach', sessionId),
   write: (sessionId, text) => ipcRenderer.invoke('write', sessionId, text),

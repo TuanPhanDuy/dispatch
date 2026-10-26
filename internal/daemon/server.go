@@ -2,11 +2,13 @@ package daemon
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"sync"
 
+	"github.com/TuanPhanDuy/dispatch/internal/accounts"
 	"github.com/TuanPhanDuy/dispatch/internal/config"
 	"github.com/TuanPhanDuy/dispatch/internal/protocol"
 )
@@ -144,7 +146,7 @@ func (c *conn) handle(env protocol.Envelope) {
 			c.sendErr(env.ID, err)
 			return
 		}
-		profile := config.AgentProfile{Name: req.Name, Command: req.Command, Args: req.Args}
+		profile := config.AgentProfile{Name: req.Name, Command: req.Command, Args: req.Args, Account: req.Account}
 		id, err := c.srv.registry.Create(profile, req.Name, req.Cwd, req.Cols, req.Rows)
 		if err != nil {
 			c.sendErr(env.ID, err)
@@ -154,6 +156,14 @@ func (c *conn) handle(env protocol.Envelope) {
 
 	case protocol.ReqAttach:
 		c.handleAttach(env)
+
+	case protocol.ReqAccounts:
+		names, err := accounts.List()
+		if err != nil {
+			c.sendErr(env.ID, err)
+			return
+		}
+		c.sendResp(env.ID, protocol.RespAccounts, protocol.AccountsResp{Accounts: names})
 
 	case protocol.ReqDetach:
 		var req protocol.SessionIDReq
@@ -223,6 +233,13 @@ func (c *conn) handle(env protocol.Envelope) {
 			return
 		}
 		c.sendResp(env.ID, protocol.RespOK, nil)
+
+	default:
+		// Answer requests from newer clients right away instead of
+		// leaving them to time out.
+		if env.ID != "" {
+			c.sendErr(env.ID, fmt.Errorf("unsupported request %q", env.Type))
+		}
 	}
 }
 

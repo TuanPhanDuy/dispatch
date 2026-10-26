@@ -25,12 +25,16 @@ const (
 	ReqRestart MsgType = "req.restart"
 	ReqRename  MsgType = "req.rename"
 	ReqRemove  MsgType = "req.remove"
+	// ReqAccounts lists the accounts that exist (see internal/accounts).
+	// Daemons older than this request answer it with RespError.
+	ReqAccounts MsgType = "req.accounts"
 
-	RespOK     MsgType = "resp.ok"
-	RespError  MsgType = "resp.error"
-	RespList   MsgType = "resp.list"
-	RespCreate MsgType = "resp.create"
-	RespAttach MsgType = "resp.attach"
+	RespOK       MsgType = "resp.ok"
+	RespError    MsgType = "resp.error"
+	RespList     MsgType = "resp.list"
+	RespCreate   MsgType = "resp.create"
+	RespAttach   MsgType = "resp.attach"
+	RespAccounts MsgType = "resp.accounts"
 
 	EventOutput      MsgType = "event.output"
 	EventSessionList MsgType = "event.session_list"
@@ -62,6 +66,9 @@ type SessionSummary struct {
 	Cwd       string        `json:"cwd"`
 	Status    SessionStatus `json:"status"`
 	StartedAt time.Time     `json:"started_at"`
+	// Account is the account the session runs under; empty means the
+	// agent's own default configuration (e.g. ~/.claude).
+	Account string `json:"account,omitempty"`
 }
 
 type CreateSessionReq struct {
@@ -71,6 +78,9 @@ type CreateSessionReq struct {
 	Cwd     string   `json:"cwd"`
 	Cols    int      `json:"cols"`
 	Rows    int      `json:"rows"`
+	// Account, if set, runs the session under that account's own
+	// configuration home (created on first use).
+	Account string `json:"account,omitempty"`
 }
 
 // SessionIDReq is shared by Detach/Kill/Restart — requests that only need
@@ -111,6 +121,10 @@ type CreateResp struct {
 
 type AttachResp struct {
 	Scrollback []byte `json:"scrollback"`
+}
+
+type AccountsResp struct {
+	Accounts []string `json:"accounts"`
 }
 
 type ListResp struct {
