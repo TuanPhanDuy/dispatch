@@ -126,6 +126,10 @@ profiles:
 - If the daemon itself is killed (not just the TUI), its sessions die with it — only closing the *TUI* is safe.
 - The idle heuristic is output-silence timing only; it doesn't try to detect "waiting for your input" vs. "thinking."
 
+## Contributing
+
+Work happens on `feature/*` branches merged into `develop`; `main` only receives releases. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
