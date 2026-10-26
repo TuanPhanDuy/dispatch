@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist:bin": "mkdir -p build/bin && cd .. && GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags '-s -w' -o gui/build/bin/dispatch-arm64 ./cmd/dispatch && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-s -w' -o gui/build/bin/dispatch-x64 ./cmd/dispatch",
+    "dist:bin": "mkdir -p build/bin && cd .. && GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags \"-s -w -X main.version=$npm_package_version\" -o gui/build/bin/dispatch-arm64 ./cmd/dispatch && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags \"-s -w -X main.version=$npm_package_version\" -o gui/build/bin/dispatch-x64 ./cmd/dispatch",
     "dist": "npm run dist:bin && electron-builder --mac dmg --arm64 --x64"
   },
   "dependencies": {
