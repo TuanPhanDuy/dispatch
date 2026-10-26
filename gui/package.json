@@ -5,11 +5,47 @@
   "description": "Electron GUI client for the dispatch daemon",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:bin": "mkdir -p build/bin && cd .. && GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags '-s -w' -o gui/build/bin/dispatch-arm64 ./cmd/dispatch && GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-s -w' -o gui/build/bin/dispatch-x64 ./cmd/dispatch",
+    "dist": "npm run dist:bin && electron-builder --mac dmg --arm64 --x64"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",
-    "@xterm/xterm": "6.0.0",
-    "electron": "45.0.0"
+    "@xterm/xterm": "6.0.0"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.16.1"
+  },
+  "productName": "dispatch",
+  "author": "TuanPhanDuy",
+  "build": {
+    "appId": "com.tuanphanduy.dispatch",
+    "productName": "dispatch",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/bin/dispatch-${arch}",
+        "to": "bin/dispatch"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": "dmg",
+      "identity": "-",
+      "artifactName": "dispatch-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "dispatch ${version}"
+    },
+    "publish": null
   }
 }

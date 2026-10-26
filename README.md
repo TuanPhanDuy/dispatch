@@ -17,6 +17,16 @@ sudo mv dispatch /usr/local/bin/
 
 On macOS, if Gatekeeper blocks the unsigned binary: `xattr -d com.apple.quarantine /usr/local/bin/dispatch`.
 
+### Desktop app (macOS)
+
+Download `dispatch-<version>-mac-arm64.dmg` (Apple Silicon) or `-mac-x64.dmg` (Intel) from the [latest release](https://github.com/TuanPhanDuy/dispatch/releases/latest) and drag **dispatch** into Applications. The app bundles its own `dispatch` binary and starts the daemon itself.
+
+The app isn't notarized by Apple, so the first launch is blocked. Either right-click the app → **Open** → **Open**, or run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/dispatch.app
+```
+
 ### Go
 
 ```sh
@@ -69,7 +79,7 @@ Everything you type is forwarded straight to the agent — arrow keys, `ctrl+c`,
 
 ### Desktop app (tiled panes)
 
-`gui/` is an Electron client for the same daemon (`cd gui && npm install && npm start`). It tiles sessions side by side so you can watch several agents at once:
+The desktop app (see Install, or `cd gui && npm install && npm start` from source) is an Electron client for the same daemon. It tiles sessions side by side so you can watch several agents at once:
 
 | Key | Action |
 |---|---|

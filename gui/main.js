@@ -9,7 +9,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 
 const CALL_TIMEOUT_MS = 10000;
 
@@ -42,10 +42,12 @@ function defaultSocketPath() {
 
 // Finds the `dispatch` Go binary so this GUI can self-exec a daemon the
 // same way the TUI does (daemon.EnsureRunning). Checked in order: an
-// explicit override, the sibling binary one level up from this file (the
-// repo-root build during development), then whatever's on PATH.
+// explicit override, the copy bundled into the packaged app, the sibling
+// binary one level up from this file (the repo-root build during
+// development), then whatever's on PATH.
 function resolveDispatchBinary() {
   if (process.env.DISPATCH_BIN) return process.env.DISPATCH_BIN;
+  if (app.isPackaged) return path.join(process.resourcesPath, 'bin', 'dispatch');
   const sibling = path.join(__dirname, '..', 'dispatch');
   if (fs.existsSync(sibling)) return sibling;
   return 'dispatch';
@@ -61,6 +63,21 @@ const AGENT_CANDIDATES = [
   { id: 'codex', label: 'Codex', command: 'codex', args: ['--full-auto'] },
   { id: 'aider', label: 'Aider', command: 'aider', args: [] },
 ];
+
+// An app opened from Finder/Dock inherits launchd's bare PATH
+// (/usr/bin:/bin:/usr/sbin:/sbin), so agent CLIs installed via npm,
+// Homebrew, etc. would be invisible to detectAgents — and to the daemon
+// this app spawns, which runs every session with its environment. Adopt
+// the user's login-shell PATH instead, the same one their terminal has.
+function adoptLoginShellPath() {
+  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  const shell = process.env.SHELL || '/bin/zsh';
+  try {
+    const out = execFileSync(shell, ['-ilc', 'printf "__PATH__%s__PATH__" "$PATH"'], { encoding: 'utf8', timeout: 5000 });
+    const m = out.match(/__PATH__(.*)__PATH__/);
+    if (m && m[1]) process.env.PATH = m[1];
+  } catch { /* keep launchd's PATH — the Shell agent still works */ }
+}
 
 function isOnPath(cmd) {
   const dirs = (process.env.PATH || '').split(path.delimiter);
@@ -399,6 +416,7 @@ function registerIpcHandlers() {
 }
 
 app.whenReady().then(async () => {
+  adoptLoginShellPath();
   const socketPath = defaultSocketPath();
   try {
     await ensureDaemonRunning(socketPath, 5000, 10);
