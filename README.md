@@ -4,7 +4,7 @@ A friendly terminal UI for managing many AI coding-agent CLI sessions (Claude Co
 
 Sessions are owned by a small background daemon, not the terminal window you opened them from. Close the TUI, close the terminal, come back tomorrow — `dispatch` reattaches to everything that's still running.
 
-**New to dispatch? Read the [user guide](docs/USER_GUIDE.md)** — installing, the desktop app and its panes, the TUI, configuration, updating, and troubleshooting.
+**New to dispatch? Read the [user guide](docs/USER_GUIDE.md)** ([Tiếng Việt](docs/USER_GUIDE.vi.md)) — installing, the desktop app and its panes, the TUI, configuration, updating, and troubleshooting.
 
 ## Install
 

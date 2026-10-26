@@ -1,5 +1,7 @@
 # dispatch user guide
 
+**English** · [Tiếng Việt](USER_GUIDE.vi.md)
+
 dispatch lets you run many AI coding agents (Claude Code, Codex, Aider, or any shell command) at once and keep an eye on all of them from one place — either a terminal UI or a desktop app.
 
 This guide covers installing, day-to-day use of both clients, configuration, updating, and troubleshooting. For the short version, see the [README](../README.md).
