@@ -588,6 +588,56 @@ function statusDotClass(status) {
   return status === 'running' ? 'good' : status === 'needs-attention' ? 'warn' : 'neutral';
 }
 
+// =================================================================
+// Auto-hiding tab bar: off by default; the choice is remembered per
+// machine. While on, the bar is revealed by hovering the top edge, by
+// keyboard focus inside it, and briefly when switching tabs by keyboard.
+// =================================================================
+
+const AUTOHIDE_KEY = 'dispatch.autohideTabs';
+const autohideBtn = document.getElementById('btn-autohide-tabs');
+const tabstripHotzone = document.getElementById('tabstrip-hotzone');
+let tabsHideTimer = null;
+
+function autohideOn() { return viewAttach.classList.contains('autohide-tabs'); }
+
+function setAutohide(on) {
+  viewAttach.classList.toggle('autohide-tabs', on);
+  autohideBtn.setAttribute('aria-pressed', String(on));
+  autohideBtn.title = on ? 'Always show the tab bar' : 'Auto-hide the tab bar';
+  tabstrip.classList.remove('revealed');
+  try { localStorage.setItem(AUTOHIDE_KEY, on ? '1' : '0'); } catch { /* per-viewer nicety only */ }
+}
+
+// Shows the bar; with ms, hides it again after that long unless the
+// pointer or focus is still on it.
+function revealTabs(ms) {
+  if (!autohideOn()) return;
+  clearTimeout(tabsHideTimer);
+  tabstrip.classList.add('revealed');
+  if (ms) scheduleHideTabs(ms);
+}
+
+function scheduleHideTabs(ms = 350) {
+  if (!autohideOn()) return;
+  clearTimeout(tabsHideTimer);
+  tabsHideTimer = setTimeout(() => {
+    if (tabstrip.matches(':hover') || tabstrip.contains(document.activeElement)) return;
+    tabstrip.classList.remove('revealed');
+  }, ms);
+}
+
+autohideBtn.addEventListener('click', () => {
+  setAutohide(!autohideOn());
+  if (autohideOn()) revealTabs(900); // keep the bar under the pointer that just clicked
+});
+tabstripHotzone.addEventListener('mouseenter', () => revealTabs());
+tabstrip.addEventListener('mouseenter', () => revealTabs());
+tabstrip.addEventListener('mouseleave', () => scheduleHideTabs());
+tabstrip.addEventListener('focusin', () => revealTabs());
+tabstrip.addEventListener('focusout', () => scheduleHideTabs());
+try { setAutohide(localStorage.getItem(AUTOHIDE_KEY) === '1'); } catch { setAutohide(false); }
+
 function renderTabs() {
   tabstrip.querySelectorAll('.tab').forEach((t) => t.remove());
   const spacer = tabstrip.querySelector('.spacer');
@@ -612,6 +662,9 @@ function renderTabs() {
       </span>`;
     tabstrip.insertBefore(el, spacer);
   }
+  const backgroundAttention = Array.from(tabs.keys()).some((id) => id !== activeTabId
+    && lastSessions.find((x) => x.id === id)?.status === 'needs-attention');
+  viewAttach.classList.toggle('tabs-attention', backgroundAttention);
 }
 
 tabstrip.addEventListener('click', (e) => {
@@ -744,13 +797,14 @@ document.addEventListener('keydown', (e) => {
   if (!mod || !attachVisible) return;
   if (/^[1-9]$/.test(e.key)) {
     const id = Array.from(tabs.keys())[Number(e.key) - 1];
-    if (id) { e.preventDefault(); activateTab(id); }
+    if (id) { e.preventDefault(); activateTab(id); revealTabs(1200); }
   } else if (e.key === ']' || e.key === '[') {
     const ids = Array.from(tabs.keys());
     const idx = ids.indexOf(activeTabId);
     if (idx >= 0 && ids.length > 1) {
       e.preventDefault();
       activateTab(ids[e.key === ']' ? (idx + 1) % ids.length : (idx - 1 + ids.length) % ids.length]);
+      revealTabs(1200);
     }
   } else if (e.key.toLowerCase() === 'w') {
     if (activeTabId) { e.preventDefault(); e.shiftKey ? closePane(activeTabId) : closeTab(activeTabId); }

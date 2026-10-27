@@ -385,6 +385,42 @@ button { font-family: var(--sans); }
 .tab.active .tab-kbd { background: var(--bg); }
 .tabstrip .spacer { flex: 1; min-width: 12px; }
 .tabstrip-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.icon-trigger[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+
+/* ---- auto-hiding tab bar ----
+   The bar leaves the layout (so panes take its space) and slides in over
+   the panes on hover — overlaying rather than pushing them down, so the
+   terminals don't resize every time it appears. */
+#view-attach { position: relative; }
+.tabstrip-hotzone { display: none; }
+#view-attach.autohide-tabs .tabstrip-hotzone {
+  display: block;
+  position: absolute; top: 0; left: 0; right: 0; height: 8px; z-index: 29;
+}
+#view-attach.autohide-tabs .tabstrip-hotzone::after {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--border); transition: background 150ms ease;
+}
+#view-attach.autohide-tabs.tabs-attention .tabstrip-hotzone::after {
+  background: var(--warn); animation: pulse 1.6s ease-in-out infinite;
+}
+#view-attach.autohide-tabs .tabstrip {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  transform: translateY(-100%);
+  visibility: hidden;
+  transition: transform 160ms ease, visibility 0s linear 160ms;
+}
+#view-attach.autohide-tabs .tabstrip.revealed {
+  transform: none;
+  visibility: visible;
+  transition: transform 160ms ease, visibility 0s;
+}
+#view-attach.autohide-tabs .attach-wrap { padding-top: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  #view-attach.autohide-tabs .tabstrip, #view-attach.autohide-tabs .tabstrip.revealed { transition: none; }
+}
 
 .pin-hint {
   padding: 6px 16px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);

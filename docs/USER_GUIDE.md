@@ -106,6 +106,8 @@ Working with panes:
 
 The focused pane has a coloured border. A pane whose agent needs attention, and that isn't focused, pulses orange until you look at it.
 
+**More room for panes:** click the auto-hide button in the top bar (the window icon with an arrow) to hide the tab bar. Move the pointer to the top edge of the window and it slides in over the panes — without resizing them — and slides away again when you move off. While it's hidden, a thin line along the top turns orange when a background tab needs attention, and switching tabs with `⌘1`–`⌘9` or `⌘]` / `⌘[` shows the bar for a moment. Click the button again to keep the bar always visible; the choice is remembered.
+
 Your pane layout is saved. The next time you open the app, the same sessions reopen in the same arrangement; sessions that have exited in the meantime are skipped.
 
 ### Keyboard shortcuts
