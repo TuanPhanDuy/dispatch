@@ -109,6 +109,8 @@ Thao tác với pane:
 
 Pane đang focus có viền màu. Pane có agent cần chú ý mà không được focus sẽ nhấp nháy viền cam cho tới khi bạn xem nó.
 
+**Thêm chỗ cho pane:** bấm nút auto-hide trên thanh trên cùng (biểu tượng cửa sổ có mũi tên) để ẩn thanh tab. Đưa chuột lên mép trên của cửa sổ, thanh tab sẽ trượt xuống đè lên các pane — không làm pane đổi kích thước — và tự ẩn lại khi bạn rời chuột. Trong lúc ẩn, một vạch mảnh dọc mép trên chuyển màu cam khi có tab nền cần chú ý, và chuyển tab bằng `⌘1`–`⌘9` hoặc `⌘]` / `⌘[` sẽ cho thanh tab hiện ra một lúc. Bấm nút lần nữa để luôn hiện thanh tab; lựa chọn được ghi nhớ.
+
 Bố cục pane được lưu lại. Lần sau mở ứng dụng, các session cũ mở lại đúng vị trí cũ; session nào đã thoát trong lúc đó sẽ được bỏ qua.
 
 ### Phím tắt
